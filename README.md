@@ -14,6 +14,7 @@ js/supabase-client.js       # ต่อ Supabase, fallback local ถ้ายั
 js/app.js                   # ร้าน + แอดมินทั้งหมด (Supabase-first)
 supabase/schema.sql         # ตาราง + RLS + Storage buckets
 supabase/migration_roles.sql  # สิทธิ์ 4 ระดับ owner/shop_admin/member/guest
+supabase/migration_v14.sql    # wishlist + reviews + media library (port จากไฟล์ v14)
 supabase/seed.sql           # สินค้า 8 ตัว + หน้าเว็บเริ่มต้น
 vercel.json / netlify.toml  # รองรับ SPA routing
 .github/workflows/check.yml # CI เช็กไฟล์
@@ -27,6 +28,7 @@ vercel.json / netlify.toml  # รองรับ SPA routing
 2. เมนู **SQL Editor → New query** → ก็อป `supabase/schema.sql` ทั้งหมด → **Run**
 3. New query อีกอัน → ก็อป `supabase/seed.sql` → **Run**
 4. New query อีกอัน → ก็อป `supabase/migration_roles.sql` → **Run** (ระบบสิทธิ์ owner/shop_admin/member/guest)
+5. New query อีกอัน → ก็อป `supabase/migration_v14.sql` → **Run** (wishlist + reviews + media library)
 5. เมนู **Storage** → ตรวจว่ามี bucket `product-images` + `slide-images` (สร้างจาก SQL แล้ว, เป็น public)
 6. เมนู **Project Settings → API** → ก็อป `Project URL` + `anon public key`
 7. เมนู **Authentication → Users → Add user** → เพิ่มอีเมล owner + shop_admin + ทดสอบ member

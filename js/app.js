@@ -33,6 +33,7 @@ var IM = {}; // id -> [imageUrl,...] (http หรือ dataURL)
 var H = { slides: JSON.parse(JSON.stringify(SEED_SLIDES)), secs: 7, logo: 1, wm: 1 };
 var PG = JSON.parse(JSON.stringify(DEFAULT_PAGE));
 var CART = [], DC = '', ORDS = {}, CUR = 'THB', OO = '';
+var WL = [], RV = {}, MD = []; // wishlist ids, reviews by product, media rows
 var LANG = 'TH'; // TH | EN
 try { LANG = localStorage.getItem('jt_lang') || 'TH'; } catch (e) {}
 function t(th, en) { return LANG === 'TH' ? th : en; }
@@ -107,6 +108,7 @@ function loadLocal() {
   try { var LH = JSON.parse(localStorage.getItem('jg_home')); if (LH && LH.slides && LH.slides.length) H = LH; } catch (e) {}
   try { var LP = JSON.parse(localStorage.getItem('jg_page')); if (LP && LP.show) PG = LP; } catch (e) {}
   try { CART = JSON.parse(localStorage.getItem('jg_cart')) || []; } catch (e) { CART = []; }
+  try { WL = JSON.parse(localStorage.getItem('jt_wishlist')) || []; } catch (e) { WL = []; }
   try { ORDS = JSON.parse(localStorage.getItem('jg_orders')) || {}; } catch (e) { ORDS = {}; }
   try { CUR = localStorage.getItem('jg_cur') || 'THB'; } catch (e) {}
   if (H.logo == null) H.logo = 1; if (H.wm == null) H.wm = 1;
@@ -147,6 +149,22 @@ async function loadSupabase() {
     if (od.data) od.data.forEach(function (r) {
       ORDS[r.order_no] = { no: r.order_no, at: r.created_at, cust: r.customer, addr: r.address, items: r.items, sub: r.subtotal, d: r.discount, ship: r.shipping, total: r.total, code: r.discount_code, pay: r.payment_method, status: r.status, track: r.tracking, note: r.note, stockDone: r.stock_deducted, log: r.log || [] };
     });
+    // v14: wishlist (merge local + server), approved reviews, media
+    try {
+      var wq = SB_USER ? await c.from('wishlists').select('product_id').eq('user_id', SB_USER.id) : { data: [] };
+      var remote = (wq.data || []).map(function (r) { return r.product_id; });
+      WL = Array.from(new Set((WL || []).concat(remote)));
+      try { localStorage.setItem('jt_wishlist', JSON.stringify(WL)); } catch (e) {}
+      if (SB_USER) WL.filter(function (id) { return remote.indexOf(id) < 0; }).forEach(function (id) { c.from('wishlists').upsert({ user_id: SB_USER.id, product_id: id }, { onConflict: 'user_id,product_id' }); });
+    } catch (e) {}
+    try {
+      var rvq = await c.from('reviews').select('*').eq('status', 'approved').order('created_at', { ascending: false }).limit(300);
+      RV = {}; (rvq.data || []).forEach(function (r) { (RV[r.product_id] = RV[r.product_id] || []).push(r); });
+    } catch (e) {}
+    try {
+      var mdq = await c.from('media').select('*').order('created_at', { ascending: false }).limit(200);
+      if (mdq.data) MD = mdq.data;
+    } catch (e) {}
     fixPG(); return true;
   } catch (e) { console.warn('supabase load failed', e); return false; }
 }
@@ -176,10 +194,29 @@ function shop() {
   return '<div class="top"><h1>' + t('คอลเลกชัน', 'Collection') + '</h1><span class="sm">' + r.length + ' ' + t('สินค้า', 'products') + (sb() ? ' · live' : ' · local') + '</span></div><div class="fl">' +
     sel('cat', t('หมวด', 'Category'), CAT.map(function (x) { return [x, x]; })) + sel('size', t('ไซส์', 'Size'), Object.keys(sizes).map(function (x) { return [x, x]; })) + sel('color', t('สี', 'Color'), Object.keys(cols).map(function (x) { return [x, x]; })) +
     sel('av', t('สถานะ', 'Availability'), [['in', t('มีของ', 'In stock')], ['out', t('หมด', 'Sold out')]]) + '<label><span class="sm">' + t('เรียง', 'Sort') + '</span><select onchange="F.sort=this.value;go()">' + [['featured', t('แนะนำ', 'Featured')], ['new', t('ใหม่สุด', 'Newest')], ['lo', t('ถูก→แพง', 'Price low-high')], ['hi', t('แพง→ถูก', 'Price high-low')]].map(function (x) { return '<option value="' + x[0] + '"' + (F.sort == x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label></div>' +
-    (r.length ? '<div class="gr">' + r.map(function (p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p.id) + '" class="pn">' + pic(p, 0) + '</a><div class="in"><h3>' + esc(p.name) + '</h3><div class="row"><span>' + thb(p.price) + (p.compare > p.price ? ' <s style="color:var(--cn)">' + thb(p.compare) + '</s>' : '') + '</span><span class="dots">' + p.colors.map(function (c) { return '<i title="' + esc(c) + '" style="background:' + (CM[c] || '#555') + '"></i>'; }).join('') + '</span></div><div class="row"><span class="av ' + a[0] + '"><b></b>' + a[1] + '</span>' + (p.stock > 0 ? '<button class="btn s" onclick="qadd(\'' + esc(p.id) + '\')">' + t('หยิบใส่ตะกร้า', 'Quick add') + '</button>' : '') + '</div></div></div>'; }).join('') + '</div>' : '<p>' + t('ไม่พบสินค้าตามเงื่อนไข', 'No products match these filters.') + '</p>');
+    (r.length ? '<div class="gr">' + r.map(function (p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p.id) + '" class="pn">' + pic(p, 0) + '</a><div class="in"><h3>' + esc(p.name) + '</h3><div class="row"><span>' + thb(p.price) + (p.compare > p.price ? ' <s style="color:var(--cn)">' + thb(p.compare) + '</s>' : '') + '</span><span class="dots">' + p.colors.map(function (c) { return '<i title="' + esc(c) + '" style="background:' + (CM[c] || '#555') + '"></i>'; }).join('') + '</span></div><div class="row"><span class="av ' + a[0] + '"><b></b>' + a[1] + '</span><span style="display:inline-flex;gap:6px">' + wishBtn(p.id) + (p.stock > 0 ? '<button class="btn s" onclick="qadd(\'' + esc(p.id) + '\')">' + t('หยิบใส่ตะกร้า', 'Quick add') + '</button>' : '') + '</span></div></div></div>'; }).join('') + '</div>' : '<p>' + t('ไม่พบสินค้าตามเงื่อนไข', 'No products match these filters.') + '</p>');
 }
 var n = 0;
 function qadd(id) { var p = gp(id); cadd(id, p.colors[0], p.sizes[0], 1); }
+
+/* ---------- wishlist (v14) ---------- */
+function wishHas(id) { return (WL || []).indexOf(id) > -1; }
+function wsave() { try { localStorage.setItem('jt_wishlist', JSON.stringify(WL)); } catch (e) {} }
+async function toggleWish(id) {
+  var i = WL.indexOf(id);
+  if (i > -1) WL.splice(i, 1); else WL.push(id);
+  wsave(); go();
+  var c = sb(); if (c && SB_USER) {
+    if (i > -1) await c.from('wishlists').delete().eq('user_id', SB_USER.id).eq('product_id', id);
+    else await c.from('wishlists').upsert({ user_id: SB_USER.id, product_id: id }, { onConflict: 'user_id,product_id' });
+  }
+  T(i > -1 ? t('เอาออกจากวิชลิสต์', 'Removed from wishlist') : t('เก็บเข้าวิชลิสต์แล้ว', 'Saved to wishlist'));
+}
+function wishBtn(id) { return '<button class="btn s" aria-pressed="' + wishHas(id) + '" onclick="toggleWish(\'' + esc(id) + '\')">' + (wishHas(id) ? '♥' : '♡') + '</button>'; }
+function wishView() {
+  var ps = WL.map(gp).filter(Boolean);
+  return '<div class="top"><h1>' + t('วิชลิสต์', 'Wishlist') + '</h1><span class="sm">' + ps.length + ' ' + t('ชิ้น', 'saved') + '</span></div>' + (ps.length ? '<div class="gr">' + ps.map(function (p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p.id) + '" class="pn">' + pic(p, 0) + '</a><div class="in"><h3>' + esc(p.name) + '</h3><div class="row"><span>' + thb(p.price) + '</span><span class="av ' + a[0] + '"><b></b>' + a[1] + '</span></div><div class="row">' + wishBtn(p.id) + (p.stock > 0 ? '<button class="btn s" onclick="qadd(\'' + esc(p.id) + '\')">' + t('หยิบใส่ตะกร้า', 'Quick add') + '</button>' : '') + '</div></div></div>'; }).join('') + '</div>' : '<p>' + t('ยังไม่มีของที่เก็บไว้', 'Your wishlist is empty.') + ' <a href="#/shop" style="text-decoration:underline">' + t('ดูสินค้า', 'Browse the collection') + '</a></p>');
+}
 
 /* ---------- product ---------- */
 function prod(id) {
@@ -188,13 +225,61 @@ function prod(id) {
   SEL.c = SEL.c && p.colors.indexOf(SEL.c) > -1 ? SEL.c : p.colors[0]; SEL.s = SEL.s && p.sizes.indexOf(SEL.s) > -1 ? SEL.s : p.sizes[0]; var a = av(p);
   function dt(t, x, d) { return '<details><summary>' + t + '</summary><p>' + esc(x || d || 'Details will be added soon.') + '</p></details>'; }
   return '<p class="sm" style="margin-bottom:20px"><a href="#/shop">Collection</a> / ' + esc(p.cat) + '</p><div class="pp">' + gal(p) +
-    '<div class="pi"><span class="sm">' + esc(p.coll) + '</span><h1>' + esc(p.name) + '</h1><div class="price">' + thb(p.price) + (p.compare > p.price ? '<s>' + thb(p.compare) + '</s>' : '') + '</div><p style="color:#b9b8ae">' + esc(p.desc) + '</p>' +
+    '<div class="pi"><span class="sm">' + esc(p.coll) + '</span><div class="row"><h1 style="flex:1">' + esc(p.name) + '</h1>' + wishBtn(p.id) + '</div><div class="price">' + thb(p.price) + (p.compare > p.price ? '<s>' + thb(p.compare) + '</s>' : '') + '</div><p style="color:#b9b8ae">' + esc(p.desc) + '</p>' +
     '<div><span class="sm">' + t('สี', 'Color') + ' — ' + esc(SEL.c) + '</span><div class="opt">' + p.colors.map(function (c) { return '<button class="sw" aria-label="' + esc(c) + '" aria-pressed="' + (c == SEL.c) + '" onclick="SEL.c=\'' + esc(c) + '\';go()"><i style="background:' + (CM[c] || '#555') + '"></i></button>'; }).join('') + '</div></div>' +
     '<div><span class="sm">' + t('ไซส์', 'Size') + '</span><div class="opt">' + p.sizes.map(function (s) { return '<button aria-pressed="' + (s == SEL.s) + '" onclick="SEL.s=\'' + esc(s) + '\';go()">' + esc(s) + '</button>'; }).join('') + '</div></div>' +
     '<div class="av ' + a[0] + '"><b></b>' + a[1] + '</div><div class="qty"><button aria-label="Less" onclick="Q=Math.max(1,Q-1);go()">–</button><span>' + Q + '</span><button aria-label="More" onclick="Q++;go()">+</button></div>' +
     (p.stock > 0 ? '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn p" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ')">' + t('หยิบใส่ตะกร้า', 'Add to cart') + '</button><button class="btn" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ',1);location.hash=\'#/checkout\'">' + t('ซื้อเลย', 'Buy now') + '</button></div>' : '<button class="btn" disabled style="opacity:.5">' + t('หมด', 'Sold out') + '</button>') +
-    '<div style="margin-top:12px">' + dt(t('รายละเอียด', 'Description'), p.desc) + dt(t('สเปก', 'Specifications'), p.spec) + dt(t('วัสดุ', 'Material'), p.material) + dt(t('ขนาด', 'Dimensions'), p.dims) + dt(t('โน้ตภาคสนาม', 'Field notes'), p.notes) + dt(t('การดูแล', 'Care'), t('ซักน้ำเย็น ตากแห้ง ห้ามฟอกขาว', 'Machine wash cold, hang dry. Do not bleach.')) + dt(t('จัดส่ง', 'Shipping'), t('ส่งใน 1–2 วันทำการทั่วไทย', 'Ships within 1–2 business days across Thailand.')) + dt(t('คืนสินค้า', 'Returns'), t('ของไม่ใช้แล้วคืนได้ใน 14 วัน', 'Unused items can be returned within 14 days.')) + '</div></div></div>';
+    '<div style="margin-top:12px">' + dt(t('รายละเอียด', 'Description'), p.desc) + dt(t('สเปก', 'Specifications'), p.spec) + dt(t('วัสดุ', 'Material'), p.material) + dt(t('ขนาด', 'Dimensions'), p.dims) + dt(t('โน้ตภาคสนาม', 'Field notes'), p.notes) + dt(t('การดูแล', 'Care'), t('ซักน้ำเย็น ตากแห้ง ห้ามฟอกขาว', 'Machine wash cold, hang dry. Do not bleach.')) + dt(t('จัดส่ง', 'Shipping'), t('ส่งใน 1–2 วันทำการทั่วไทย', 'Ships within 1–2 business days across Thailand.')) + dt(t('คืนสินค้า', 'Returns'), t('ของไม่ใช้แล้วคืนได้ใน 14 วัน', 'Unused items can be returned within 14 days.')) + '</div></div></div>' + reviewBlock(p.id);
 }
+
+/* ---------- reviews (v14) ---------- */
+function reviewBlock(pid) {
+  var list = RV[pid] || [], avg = list.length ? (list.reduce(function (a, r) { return a + (+r.rating || 0); }, 0) / list.length) : 0;
+  var h = '<div style="margin-top:40px"><h2 style="font-size:clamp(28px,4vw,48px)">' + t('รีวิว', 'Reviews') + (list.length ? ' (' + list.length + ' · ★' + avg.toFixed(1) + ')' : '') + '</h2>';
+  h += list.length ? list.map(function (r) { return '<div class="jt-panel" style="margin-top:10px"><b>' + esc(r.name || 'member') + '</b> <span class="sm">' + '★'.repeat(+r.rating || 5) + ' · ' + new Date(r.created_at).toLocaleDateString('en-GB') + '</span><p style="margin-top:6px">' + esc(r.text) + '</p></div>'; }).join('') : '<p class="sm" style="margin-top:8px">' + t('ยังไม่มีรีวิว เป็นคนแรกเลย', 'No reviews yet — be the first.') + '</p>';
+  if (SB_USER) h += '<div class="fm" style="margin-top:12px;grid-template-columns:1fr"><label>' + t('คะแนน', 'Rating') + '<select id="rv-rating"><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label><label class="full">' + t('รีวิวของคุณ', 'Your review') + '<textarea id="rv-text"></textarea></label><div><button class="btn p" onclick="rvSubmit(\'' + esc(pid) + '\',this)">' + t('ส่งรีวิว', 'Submit review') + '</button></div></div>';
+  else h += '<p style="margin-top:12px"><a class="btn" href="#/admin/system/supabase">Login ' + t('เพื่อรีวิว', 'to review') + '</a></p>';
+  return h + '</div>';
+}
+window.rvSubmit = async function (pid, btn) {
+  var c = sb(); if (!c || !SB_USER) { location.hash = '#/admin/system/supabase'; return; }
+  var rating = +((document.getElementById('rv-rating') || {}).value || 5);
+  var text = ((document.getElementById('rv-text') || {}).value || '').trim();
+  if (!text) { T(t('เขียนรีวิวก่อน', 'Write your review first')); return; }
+  lockBtn(btn, true);
+  var r = await c.from('reviews').insert({ product_id: pid, user_id: SB_USER.id, name: (SB_USER.email || '').split('@')[0], rating: rating, text: text, status: 'pending' });
+  lockBtn(btn, false);
+  if (r.error) { T(authErr(r.error.message)); return; }
+  T(t('ส่งรีวิวแล้ว รอตรวจสอบ', 'Review submitted — pending approval')); go();
+};
+function jtReviews() {
+  return jtShell(t('รีวิว', 'Reviews'), '#/admin/reviews', '<div class="jt-panel"><div style="margin-bottom:12px"><button class="btn s" onclick="rvLoad(true)">' + t('โหลดทั้งหมด (รวมรอตรวจ)', 'Load all incl. pending') + '</button></div><div id="rv-admin">' + rvAdminRows() + '</div></div>');
+}
+function rvAdminRows() {
+  var all = []; Object.keys(RV).forEach(function (pid) { (RV[pid] || []).forEach(function (r) { r._pid = pid; all.push(r); }); });
+  all.sort(function (a, b) { return a.created_at < b.created_at ? 1 : -1; });
+  if (!all.length) return '<p class="sm">' + t('ยังไม่มีรีวิว', 'No reviews yet.') + '</p>';
+  return '<table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>' + t('ชื่อ', 'Name') + '</th><th>★</th><th>' + t('ข้อความ', 'Text') + '</th><th>' + t('สถานะ', 'Status') + '</th><th></th></tr>' + all.map(function (r) { return '<tr><td>' + esc((gp(r._pid) || {}).name || r._pid) + '</td><td>' + esc(r.name) + '</td><td>' + r.rating + '</td><td>' + esc(r.text) + '</td><td><span class="bd">' + r.status + '</span></td><td style="text-align:right;white-space:nowrap">' + (r.status !== 'approved' ? '<button class="btn s" onclick="rvSet(\'' + r.id + '\',\'approved\')">✓</button> ' : '') + (r.status !== 'rejected' ? '<button class="btn s" onclick="rvSet(\'' + r.id + '\',\'rejected\')">✕</button> ' : '') + '<button class="btn s d" onclick="rvDel(\'' + r.id + '\')">' + t('ลบ', 'Delete') + '</button></td></tr>'; }).join('') + '</table>';
+}
+window.rvLoad = async function (all) {
+  var c = sb(); if (!c || !isStaff()) return;
+  var q = c.from('reviews').select('*').order('created_at', { ascending: false }).limit(300);
+  if (!all) q = q.eq('status', 'approved');
+  var r = await q; if (r.error) { T(r.error.message); return; }
+  RV = {}; (r.data || []).forEach(function (x) { (RV[x.product_id] = RV[x.product_id] || []).push(x); }); go();
+};
+window.rvSet = async function (id, st) {
+  var c = sb(); if (!c || !isStaff()) return;
+  var r = await c.from('reviews').update({ status: st }).eq('id', id);
+  if (r.error) T(r.error.message); else { T(t('บันทึกแล้ว', 'Saved')); rvLoad(true); }
+};
+window.rvDel = async function (id) {
+  var c = sb(); if (!c || !isStaff()) return;
+  if (!confirm(t('ลบรีวิวนี้?', 'Delete this review?'))) return;
+  var r = await c.from('reviews').delete().eq('id', id);
+  if (r.error) T(r.error.message); else { T(t('ลบแล้ว', 'Deleted')); rvLoad(true); }
+};
 
 /* ---------- cart / checkout ---------- */
 function csave() { try { localStorage.setItem('jg_cart', JSON.stringify(CART)); } catch (e) {} cnt(); }
@@ -324,7 +409,7 @@ async function del(i) { if (!isOwner()) { T('ลบสินค้าได้�
 function sync() { document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k; E[k] = k == 'featured' ? (e.value == '1' ? 1 : 0) : e.value; }); }
 function redraw() { var y = scrollY; go(); scrollTo(0, y); }
 function imgui() {
-  return '<div class="w4"><span>' + t('รูปสินค้า', 'Product images') + ' (' + EI.length + '/4)' + (sb() ? ' · Supabase Storage' : ' · local') + '</span><div class="im" style="margin-top:8px">' + EI.map(function (s, i) { return '<div><div class="pn"><img src="' + s + '" alt=""></div><div style="display:flex;gap:6px"><button class="btn s" onclick="imv(' + i + ')"' + (i ? '' : ' disabled') + '>' + t('ตั้งเป็นปก', 'Make first') + '</button><button class="btn s d" onclick="irm(' + i + ')">' + t('ลบ', 'Remove') + '</button></div></div>'; }).join('') + '</div>' + (EI.length < 4 ? '<button class="btn s" style="margin-top:10px" onclick="document.getElementById(\'fi\').click()">' + t('อัปโหลดรูป', 'Upload images') + '</button><input id="fi" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onchange="iup(this.files)">' : '') + '<p style="font-size:12px">JPG/PNG/WebP ' + t('สูงสุด 4 รูป รูปแรกคือปก ย่อเหลือ 1000px อัตโนมัติ', 'up to 4 images, first is cover, auto-resized to 1000px') + (sb() ? t(' อัปโหลดเข้า Storage bucket product-images', ' · uploads to product-images bucket') : '') + '</p></div>';
+  return '<div class="w4"><span>' + t('รูปสินค้า', 'Product images') + ' (' + EI.length + '/4)' + (sb() ? ' · Supabase Storage' : ' · local') + '</span><div class="im" style="margin-top:8px">' + EI.map(function (s, i) { return '<div><div class="pn"><img src="' + s + '" alt=""></div><div style="display:flex;gap:6px"><button class="btn s" onclick="imv(' + i + ')"' + (i ? '' : ' disabled') + '>' + t('ตั้งเป็นปก', 'Make first') + '</button><button class="btn s d" onclick="irm(' + i + ')">' + t('ลบ', 'Remove') + '</button></div></div>'; }).join('') + '</div>' + (EI.length < 4 ? '<button class="btn s" style="margin-top:10px" onclick="document.getElementById(\'fi\').click()">' + t('อัปโหลดรูป', 'Upload images') + '</button> <button class="btn s" style="margin-top:10px" onclick="pickProductImg()">' + t('จากคลัง', 'Library') + '</button><input id="fi" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onchange="iup(this.files)">' : '') + '<p style="font-size:12px">JPG/PNG/WebP ' + t('สูงสุด 4 รูป รูปแรกคือปก ย่อเหลือ 1000px อัตโนมัติ', 'up to 4 images, first is cover, auto-resized to 1000px') + (sb() ? t(' อัปโหลดเข้า Storage bucket product-images', ' · uploads to product-images bucket') : '') + '</p></div>';
 }
 function imv(i) { sync(); EI.unshift(EI.splice(i, 1)[0]); redraw(); }
 function irm(i) { sync(); EI.splice(i, 1); redraw(); }
@@ -354,6 +439,56 @@ async function iup(fs) {
   redraw();
 }
 
+/* ---------- media library (v14) ---------- */
+var mediaCb = null;
+function jtMediaPage() {
+  var folders = Array.from(new Set(MD.map(function (m) { return m.folder || 'General'; })));
+  return jtShell(t('คลังรูป', 'Media'), '#/admin/website/media', '<div class="jt-panel"><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn p" onclick="document.getElementById(\'md-file\').click()">' + t('อัปโหลดรูป', 'Upload') + '</button><input id="md-file" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onchange="mdUpload(this.files);this.value=\'\'"><span class="sm" style="align-self:center">' + MD.length + ' ' + t('ไฟล์', 'files') + '</span></div>' + (MD.length ? '<div class="im" style="grid-template-columns:repeat(4,1fr)">' + MD.map(function (m) { return '<div><div class="pn" style="aspect-ratio:1"><img src="' + m.url + '" alt="" loading="lazy"></div><div class="sm" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(m.name) + '</div><div style="display:flex;gap:6px;margin-top:4px"><button class="btn s" onclick="mdCopy(\'' + m.id + '\')">URL</button><button class="btn s d" onclick="mdDel(\'' + m.id + '\')">' + t('ลบ', 'Delete') + '</button></div></div>'; }).join('') + '</div>' : '<p class="sm">' + t('ยังไม่มีรูป — อัปโหลดเพื่อใช้ซ้ำทั้งเว็บ', 'No media yet — upload once, reuse everywhere.') + '</p>') + (folders.length ? '<p class="jgt-muted" style="margin-top:8px">Folders: ' + folders.map(esc).join(', ') + '</p>' : '') + '</div>');
+}
+window.mdUpload = async function (fs) {
+  var c = sb(); if (!c || !isOwner()) { T(t('อัปโหลดได้เฉพาะ owner', 'Owner only')); return; }
+  var files = Array.prototype.slice.call(fs || []).filter(function (f) { return ['image/jpeg', 'image/png', 'image/webp'].indexOf(f.type) > -1 && f.size <= 15e6; });
+  if (!files.length) { T(t('ใช้ JPG/PNG/WebP ไม่เกิน 15MB', 'JPG/PNG/WebP under 15MB only')); return; }
+  for (var i = 0; i < files.length; i++) {
+    var r = await rsBlob(files[i], 1600); if (!r || !r.blob) continue;
+    var path = 'lib/' + Date.now().toString(36) + '-' + i + '.jpg';
+    var up = await c.storage.from('media').upload(path, r.blob, { contentType: 'image/jpeg', upsert: true });
+    if (up.error) { T(up.error.message); continue; }
+    var pub = c.storage.from('media').getPublicUrl(path);
+    await c.from('media').insert({ url: pub.data.publicUrl, path: path, name: files[i].name, folder: 'General', size: files[i].size });
+  }
+  var mdq = await c.from('media').select('*').order('created_at', { ascending: false }).limit(200);
+  if (!mdq.error) MD = mdq.data || MD;
+  T(t('อัปโหลดแล้ว', 'Uploaded')); go();
+};
+window.mdCopy = function (id) {
+  var m = MD.filter(function (x) { return x.id === id; })[0]; if (!m) return;
+  var done = function () { T('URL copied'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(m.url).then(done, function () { prompt('Copy URL:', m.url); });
+  else prompt('Copy URL:', m.url);
+};
+window.mdDel = async function (id) {
+  var c = sb(); if (!c || !isOwner()) return;
+  if (!confirm(t('ลบไฟล์นี้?', 'Delete this file?'))) return;
+  var m = MD.filter(function (x) { return x.id === id; })[0];
+  if (m && m.path) await c.storage.from('media').remove([m.path]);
+  var r = await c.from('media').delete().eq('id', id);
+  if (r.error) T(r.error.message); else { MD = MD.filter(function (x) { return x.id !== id; }); T(t('ลบแล้ว', 'Deleted')); go(); }
+};
+/* picker modal: เลือกรูปจากคลังไปใช้ */
+function openMediaPicker(cb) {
+  mediaCb = cb;
+  var ov = document.createElement('div');
+  ov.id = 'md-picker'; ov.style.cssText = 'position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);display:grid;place-items:center;padding:20px';
+  ov.innerHTML = '<div style="background:#11120f;border:1px solid var(--ln);max-width:860px;width:100%;max-height:84vh;overflow:auto;padding:18px"><div class="row" style="margin-bottom:12px"><h3 style="font-size:24px">' + t('เลือกจากคลัง', 'Pick from library') + '</h3><button class="btn s" onclick="closeMediaPicker()">✕</button></div>' + (MD.length ? '<div class="im" style="grid-template-columns:repeat(4,1fr)">' + MD.map(function (m, i) { return '<div><div class="pn" style="aspect-ratio:1;cursor:pointer" onclick="pickMedia(' + i + ')"><img src="' + m.url + '" alt="" loading="lazy"></div><div class="sm" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(m.name) + '</div></div>'; }).join('') + '</div>' : '<p class="sm">' + t('คลังว่าง — อัปโหลดที่หน้า Media ก่อน', 'Library is empty — upload in Media first.') + '</p>') + '</div>';
+  ov.addEventListener('click', function (e) { if (e.target === ov) closeMediaPicker(); });
+  document.body.appendChild(ov);
+}
+function closeMediaPicker() { mediaCb = null; var ov = document.getElementById('md-picker'); if (ov) ov.remove(); }
+function pickMedia(i) { var m = MD[i]; if (m && mediaCb) { var cb = mediaCb; closeMediaPicker(); cb(m.url); } }
+function pickProductImg() { sync(); if (EI.length >= 4) { T(t('ได้สูงสุด 4 รูป', 'Max 4 images')); return; } openMediaPicker(function (url) { EI.push(url); redraw(); }); }
+function pickSlideImg(i) { openMediaPicker(function (url) { HS.slides[i].img = url; redraw(); }); }
+
 /* ---------- admin: homepage / sections ---------- */
 function adminHome() {
   if (!HS) HS = JSON.parse(JSON.stringify(H)); var s = HS.slides;
@@ -361,7 +496,7 @@ function adminHome() {
   function hck(k, l) { return '<label style="flex-direction:row;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ow)"><input type="checkbox"' + (HS[k] ? ' checked' : '') + ' onchange="HS.' + k + '=this.checked?1:0" style="width:18px;height:18px;min-width:0">' + l + '</label>'; }
   return '<div class="top"><h1>' + t('หน้าแรก', 'Homepage') + '</h1><button class="btn p" onclick="hsave()">' + t('บันทึกหน้าแรก', 'Save homepage') + '</button></div>' + (sb() ? '' : '<div class="note">Local mode</div>') +
     '<div class="fm" style="grid-template-columns:1fr">' + hck('logo', t('โชว์โลโก้', 'Show brand logo')) + hck('wm', t('โชว์ลายน้ำ', 'Show watermark')) + '<label>' + t('วินาทีต่อสไลด์', 'Seconds per slide') + '<input type="number" min="3" max="30" value="' + HS.secs + '" oninput="HS.secs=Math.min(30,Math.max(3,+this.value||7))"></label></div>' +
-    s.map(function (x, i) { var u = simg(x.img); return '<div class="fm" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))"><div style="display:grid;gap:8px;align-content:start"><div class="pn" style="aspect-ratio:16/9">' + (u ? '<img src="' + u + '" alt="">' : '<span style="position:absolute;inset:0;display:grid;place-items:center;z-index:1;font-size:12px">' + t('ไม่มีรูป', 'No image') + '</span>') + '</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn s" onclick="document.getElementById(\'hf' + i + '\').click()">' + (u ? t('เปลี่ยน', 'Replace') : t('อัปโหลด', 'Upload')) + '</button>' + (u ? '<button class="btn s d" onclick="hset(' + i + ',\'img\',\'\',1)">' + t('ลบ', 'Remove') + '</button>' : '') + '<input id="hf' + i + '" type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="hup(' + i + ',this.files)"></div></div>' +
+    s.map(function (x, i) { var u = simg(x.img); return '<div class="fm" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))"><div style="display:grid;gap:8px;align-content:start"><div class="pn" style="aspect-ratio:16/9">' + (u ? '<img src="' + u + '" alt="">' : '<span style="position:absolute;inset:0;display:grid;place-items:center;z-index:1;font-size:12px">' + t('ไม่มีรูป', 'No image') + '</span>') + '</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn s" onclick="document.getElementById(\'hf' + i + '\').click()">' + (u ? t('เปลี่ยน', 'Replace') : t('อัปโหลด', 'Upload')) + '</button><button class="btn s" onclick="pickSlideImg(' + i + ')">' + t('จากคลัง', 'Library') + '</button>' + (u ? '<button class="btn s d" onclick="hset(' + i + ',\'img\',\'\',1)">' + t('ลบ', 'Remove') + '</button>' : '') + '<input id="hf' + i + '" type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="hup(' + i + ',this.files)"></div></div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' + inp(i, 'h', t('หัวข้อ', 'Headline'), '', 'w2') + inp(i, 'sub', t('หัวข้อรอง', 'Subheadline'), '', 'w2') + inp(i, 'b1', t('ปุ่ม 1', 'Button 1')) + inp(i, 'l1', t('ลิงก์ 1', 'Link 1'), '#/shop') + inp(i, 'b2', t('ปุ่ม 2', 'Button 2')) + inp(i, 'l2', t('ลิงก์ 2', 'Link 2'), '#/shop') +
       '<div class="w2" style="display:flex;gap:8px"><button class="btn s" onclick="hmv(' + i + ',-1)"' + (i ? '' : ' disabled') + '>' + t('ขึ้น', 'Up') + '</button><button class="btn s" onclick="hmv(' + i + ',1)"' + (i < s.length - 1 ? '' : ' disabled') + '>' + t('ลง', 'Down') + '</button><button class="btn s d" onclick="hdel(' + i + ')"' + (s.length > 1 ? '' : ' disabled') + '>' + t('ลบ', 'Delete') + '</button></div></div></div>'; }).join('') + (s.length < 6 ? '<button class="btn" onclick="hadd()">' + t('เพิ่มสไลด์', 'Add slide') + '</button>' : '');
 }
@@ -428,13 +563,13 @@ async function oset(no, k, v) { if (!isStaff()) { T('ต้อง login เป�
 
 /* ---------- admin shell ---------- */
 function jtNav(active) {
-  var store = [[t('หน้าแรก', 'Home'), '#/'], [t('ร้านค้า', 'Shop'), '#/shop'], [t('สินค้า', 'Product'), '#/product'], [t('ตะกร้า', 'Cart'), '#/cart'], [t('ชำระเงิน', 'Checkout'), '#/checkout'], [t('สำเร็จ', 'Order Complete'), '#/order-complete']];
+  var store = [[t('หน้าแรก', 'Home'), '#/'], [t('ร้านค้า', 'Shop'), '#/shop'], [t('สินค้า', 'Product'), '#/product'], [t('ตะกร้า', 'Cart'), '#/cart'], [t('ชำระเงิน', 'Checkout'), '#/checkout'], [t('วิชลิสต์', 'Wishlist'), '#/wishlist'], [t('สำเร็จ', 'Order Complete'), '#/order-complete']];
   if (SB_USER) store.push([t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders']);
   else store.push([t('สมัครสมาชิก', 'Sign up'), '#/signup']);
   var groups = [[t('ร้าน', 'STORE'), store]];
-  if (isStaff()) groups.push([t('จัดการร้าน', 'ADMIN'), [[t('แดชบอร์ด', 'Dashboard'), '#/admin/dashboard'], [t('สินค้า', 'Products'), '#/admin/products'], [t('สต็อก', 'Inventory'), '#/admin/inventory'], [t('คำสั่งซื้อ', 'Orders'), '#/admin/orders'], [t('ลูกค้า', 'Customers'), '#/admin/customers']]]);
+  if (isStaff()) groups.push([t('จัดการร้าน', 'ADMIN'), [[t('แดชบอร์ด', 'Dashboard'), '#/admin/dashboard'], [t('สินค้า', 'Products'), '#/admin/products'], [t('สต็อก', 'Inventory'), '#/admin/inventory'], [t('คำสั่งซื้อ', 'Orders'), '#/admin/orders'], [t('ลูกค้า', 'Customers'), '#/admin/customers'], [t('รีวิว', 'Reviews'), '#/admin/reviews']]]);
   if (isOwner()) {
-    groups.push([t('เว็บ', 'WEBSITE'), [[t('หน้าแรก', 'Homepage'), '#/admin/website/homepage'], [t('ส่วนต่างๆ', 'Sections'), '#/admin/website/sections']]]);
+    groups.push([t('เว็บ', 'WEBSITE'), [[t('หน้าแรก', 'Homepage'), '#/admin/website/homepage'], [t('ส่วนต่างๆ', 'Sections'), '#/admin/website/sections'], [t('คลังรูป', 'Media'), '#/admin/website/media']]]);
     groups.push([t('ตั้งค่า', 'SETTINGS'), [[t('ทั่วไป', 'General'), '#/admin/settings/general'], [t('จัดส่ง', 'Shipping'), '#/admin/settings/shipping'], [t('จ่ายเงิน', 'Payment'), '#/admin/settings/payment'], [t('ติดต่อ', 'Contact'), '#/admin/settings/contact'], ['SEO', '#/admin/settings/seo'], [t('ปิดปรับปรุง', 'Maintenance'), '#/admin/settings/maintenance']]]);
   }
   var sys = [[t('เชื่อมต่อ', 'Supabase'), '#/admin/system/supabase']];
@@ -622,12 +757,14 @@ function go() {
   if (h === '#/account/orders') v = myOrdersView();
   else if (h === '#/signup') v = signupView();
   else if (h === '#/admin' || h === '#/admin/dashboard') v = isStaff() ? jtDashboard() : deny('Staff only');
-  else if (h === '#/admin/products') v = isStaff() ? jtShell('Products', '#/admin/products', admin()) : deny('Staff only');
+  else if (h === '#/admin/products') v = isStaff() ? jtShell(t('สินค้า', 'Products'), '#/admin/products', admin()) : deny('Staff only');
   else if (h === '#/admin/inventory') v = isStaff() ? jtInventory() : deny('Staff only');
-  else if (h === '#/admin/orders') v = isStaff() ? jtShell('Orders', '#/admin/orders', adminOrd()) : deny('Staff only');
+  else if (h === '#/admin/orders') v = isStaff() ? jtShell(t('คำสั่งซื้อ', 'Orders'), '#/admin/orders', adminOrd()) : deny('Staff only');
   else if (h === '#/admin/customers') v = isStaff() ? jtCustomers() : deny('Staff only');
-  else if (h === '#/admin/website/homepage') v = isOwner() ? jtShell('Homepage', '#/admin/website/homepage', adminHome()) : deny('Owner only');
-  else if (h === '#/admin/website/sections') v = isOwner() ? jtShell('Sections', '#/admin/website/sections', adminSec()) : deny('Owner only');
+  else if (h === '#/admin/reviews') v = isStaff() ? jtReviews() : deny('Staff only');
+  else if (h === '#/admin/website/homepage') v = isOwner() ? jtShell(t('หน้าแรก', 'Homepage'), '#/admin/website/homepage', adminHome()) : deny('Owner only');
+  else if (h === '#/admin/website/media') v = isOwner() ? jtMediaPage() : deny('Owner only');
+  else if (h === '#/admin/website/sections') v = isOwner() ? jtShell(t('ส่วนต่างๆ', 'Sections'), '#/admin/website/sections', adminSec()) : deny('Owner only');
   else if (/^#\/admin\/settings\//.test(h)) v = isOwner() ? jtSettings(h.split('/')[3]) : deny('Owner only');
   else if (h === '#/admin/system/supabase') v = jtSupabase();
   else if (h === '#/admin/system/staff') v = isStaff() ? jtStaff() : deny('Staff only');
@@ -637,6 +774,7 @@ function go() {
   else if (m) v = prod(decodeURIComponent(m[1]));
   else if (h.indexOf('#/cart') === 0) v = cartView();
   else if (h.indexOf('#/checkout') === 0) v = checkoutView();
+  else if (h === '#/wishlist') v = wishView();
   else if (isH) v = homeView();
   else v = shop();
   a.innerHTML = isH ? v : '<div class="w">' + v + '</div>';
