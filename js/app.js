@@ -497,9 +497,19 @@ window.SBClear = function () { SB.clearConn(); };
 window.sbLogin = async function () {
   var c = sb(); if (!c) { T('ต่อ Supabase ก่อน'); return; }
   var em = (document.getElementById('sb_email') || {}).value || prompt('Admin email:'); if (!em) return;
-  var r = await c.auth.signInWithOtp({ email: em.trim() });
-  if (r.error) T(r.error.message); else T('ส่งลิงก์ login ไปที่ ' + em + ' แล้ว');
+  var r = await c.auth.signInWithOtp({ email: em.trim(), options: { emailRedirectTo: location.origin + '/' } });
+  if (r.error) T(r.error.message); else T('ส่งลิงก์ login ไปที่ ' + em + ' แล้ว — กดลิงก์ล่าสุดในเบราว์เซอร์นี้ภายใน 1 ชม.');
 };
+/* อ่าน error จาก magic-link redirect (เช่น otp_expired) แล้วแจ้งเป็นภาษาคน */
+function handleAuthRedirect() {
+  var h = location.hash || '';
+  if (!/error=|error_code=/.test(h)) return;
+  var get = function (k) { var m = h.match(new RegExp(k + '=([^&]+)')); return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : ''; };
+  var code = get('error_code'), desc = get('error_description');
+  if (code === 'otp_expired') T('ลิงก์หมดอายุ/ถูกใช้ไปแล้ว — กด Send magic link ใหม่ แล้วกดลิงก์ล่าสุดในเบราว์เซอร์เดิม');
+  else if (desc) T(desc);
+  try { history.replaceState(null, '', location.pathname + '#/admin/system/supabase'); } catch (e) { location.hash = '#/admin/system/supabase'; }
+}
 window.sbLogout = async function () { var c = sb(); if (c) await c.auth.signOut(); SB_USER = null; SB_ROLE = 'guest'; SB_PROFILES = []; T('Logged out'); go(); };
 
 /* ---------- misc views ---------- */
@@ -548,7 +558,7 @@ function go() {
 window.addEventListener('hashchange', function () { Q = 1; SEL = {}; E = null; HS = null; PGS = null; hc(); go(); scrollTo(0, 0); });
 
 /* ---------- boot ---------- */
-loadLocal(); hc(); go();
+loadLocal(); handleAuthRedirect(); hc(); go();
 (async function () {
   var ok = await loadSupabase();
   if (isStaff()) await sbLoadProfilesSilent();
