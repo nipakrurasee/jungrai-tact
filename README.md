@@ -13,6 +13,7 @@ js/config.example.js
 js/supabase-client.js       # ต่อ Supabase, fallback local ถ้ายังไม่ตั้งค่า
 js/app.js                   # ร้าน + แอดมินทั้งหมด (Supabase-first)
 supabase/schema.sql         # ตาราง + RLS + Storage buckets
+supabase/migration_roles.sql  # สิทธิ์ 4 ระดับ owner/shop_admin/member/guest
 supabase/seed.sql           # สินค้า 8 ตัว + หน้าเว็บเริ่มต้น
 vercel.json / netlify.toml  # รองรับ SPA routing
 .github/workflows/check.yml # CI เช็กไฟล์
@@ -25,9 +26,17 @@ vercel.json / netlify.toml  # รองรับ SPA routing
 1. สมัคร https://supabase.com → New project → จำ DB password ไว้
 2. เมนู **SQL Editor → New query** → ก็อป `supabase/schema.sql` ทั้งหมด → **Run**
 3. New query อีกอัน → ก็อป `supabase/seed.sql` → **Run**
-4. เมนู **Storage** → ตรวจว่ามี bucket `product-images` + `slide-images` (สร้างจาก SQL แล้ว, เป็น public)
-5. เมนู **Project Settings → API** → ก็อป `Project URL` + `anon public key`
-6. เมนู **Authentication → Users → Add user** → เพิ่มอีเมลตัวเอง (admin) แบบ Email + password หรือ magic link
+4. New query อีกอัน → ก็อป `supabase/migration_roles.sql` → **Run** (ระบบสิทธิ์ owner/shop_admin/member/guest)
+5. เมนู **Storage** → ตรวจว่ามี bucket `product-images` + `slide-images` (สร้างจาก SQL แล้ว, เป็น public)
+6. เมนู **Project Settings → API** → ก็อป `Project URL` + `anon public key`
+7. เมนู **Authentication → Users → Add user** → เพิ่มอีเมล owner + shop_admin + ทดสอบ member
+8. ตั้ง owner คนแรกใน SQL Editor:
+```sql
+update public.profiles set role = 'owner' where email = 'owner@jungrai.com';
+update public.profiles set role = 'shop_admin' where email = 'staff@jungrai.com';
+```
+
+สิทธิ์: owner ทุกอย่าง · shop_admin เติมสต็อก+ออเดอร์ (แก้ราคา/ลบ/แก้เว็บไม่ได้, กันด้วย trigger) · member ดู `#/account/orders` ของตัวเอง · guest สั่งซื้อได้อย่างเดียว เปลี่ยน role ที่ `#/admin/system/staff` (owner เท่านั้น)
 
 ตารางที่สร้าง: `products, slides, site_configs, discount_codes, customers, orders, activity_log`
 

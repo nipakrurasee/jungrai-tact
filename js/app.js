@@ -37,6 +37,22 @@ var STS = ['new', 'paid', 'processing', 'packed', 'shipped', 'delivered', 'cance
 var F = { cat: '', size: '', color: '', av: '', sort: 'featured' };
 var Q = 1, SEL = {}, E = null, EI = [], HS = null, PGS = null, HT = null, HT2 = null, HK = 0;
 var SB_USER = null;
+var SB_ROLE = 'guest'; // guest | member | shop_admin | owner
+var SB_PROFILES = [];
+
+/* ---------- roles ---------- */
+function myRole() { return sb() ? SB_ROLE : 'owner'; } // local mode = เจ้าของเครื่องทำได้หมด
+function isOwner() { return myRole() === 'owner'; }
+function isStaff() { return myRole() === 'owner' || myRole() === 'shop_admin'; }
+function isMember() { return myRole() === 'member' || isStaff(); }
+function roleLabel() { return { guest: 'Guest', member: 'Member', shop_admin: 'Shop admin', owner: 'Owner' }[myRole()] || myRole(); }
+async function loadRole() {
+  var c = sb(); if (!c || !SB_USER) { SB_ROLE = c ? (SB_USER ? 'member' : 'guest') : 'owner'; return; }
+  try {
+    var r = await c.from('profiles').select('role').eq('id', SB_USER.id).single();
+    SB_ROLE = (r.data && r.data.role) || 'member';
+  } catch (e) { SB_ROLE = 'member'; }
+}
 var PROV = 'กรุงเทพมหานคร,กระบี่,กาญจนบุรี,กาฬสินธุ์,กำแพงเพชร,ขอนแก่น,จันทบุรี,ฉะเชิงเทรา,ชลบุรี,ชัยนาท,ชัยภูมิ,ชุมพร,เชียงราย,เชียงใหม่,ตรัง,ตราด,ตาก,นครนายก,นครปฐม,นครพนม,นครราชสีมา,นครศรีธรรมราช,นครสวรรค์,นนทบุรี,นราธิวาส,น่าน,บึงกาฬ,บุรีรัมย์,ปทุมธานี,ประจวบคีรีขันธ์,ปราจีนบุรี,ปัตตานี,พระนครศรีอยุธยา,พะเยา,พังงา,พัทลุง,พิจิตร,พิษณุโลก,เพชรบุรี,เพชรบูรณ์,แพร่,ภูเก็ต,มหาสารคาม,มุกดาหาร,แม่ฮ่องสอน,ยโสธร,ยะลา,ร้อยเอ็ด,ระนอง,ระยอง,ราชบุรี,ลพบุรี,ลำปาง,ลำพูน,เลย,ศรีสะเกษ,สกลนคร,สงขลา,สตูล,สมุทรปราการ,สมุทรสงคราม,สมุทรสาคร,สระแก้ว,สระบุรี,สิงห์บุรี,สุโขทัย,สุพรรณบุรี,สุราษฎร์ธานี,สุรินทร์,หนองคาย,หนองบัวลำภู,อ่างทอง,อำนาจเจริญ,อุดรธานี,อุตรดิตถ์,อุทัยธานี,อุบลราชธานี'.split(',');
 
 /* ---------- helpers ---------- */
@@ -103,11 +119,15 @@ async function loadSupabase() {
     }
     var cf = await c.from('site_configs').select('*');
     if (cf.data) cf.data.forEach(function (r) { if (r.key == 'home') { H.secs = r.value.secs || 7; H.logo = r.value.logo == 0 ? 0 : 1; H.wm = r.value.wm == 0 ? 0 : 1; } if (r.key == 'page') { PG = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PAGE)), r.value); } });
-    var od = await c.from('orders').select('*').order('created_at', { ascending: false }).limit(200);
+    var se = await c.auth.getSession(); SB_USER = se.data.session ? se.data.session.user : null;
+    await loadRole();
+    var od;
+    if (!SB_USER) od = { data: [] };
+    else if (isStaff()) od = await c.from('orders').select('*').order('created_at', { ascending: false }).limit(200);
+    else od = await c.from('orders').select('*').eq('user_id', SB_USER.id).order('created_at', { ascending: false }).limit(200);
     if (od.data) od.data.forEach(function (r) {
       ORDS[r.order_no] = { no: r.order_no, at: r.created_at, cust: r.customer, addr: r.address, items: r.items, sub: r.subtotal, d: r.discount, ship: r.shipping, total: r.total, code: r.discount_code, pay: r.payment_method, status: r.status, track: r.tracking, note: r.note, stockDone: r.stock_deducted, log: r.log || [] };
     });
-    var se = await c.auth.getSession(); SB_USER = se.data.session ? se.data.session.user : null;
     fixPG(); return true;
   } catch (e) { console.warn('supabase load failed', e); return false; }
 }
@@ -118,7 +138,7 @@ async function dbUpsertProduct(o) {
 async function dbDeleteProduct(id) { var c = sb(); if (!c) return; await c.from('products').delete().eq('id', id); }
 async function dbSaveOrder(o) {
   var c = sb(); if (!c) return;
-  await c.from('orders').insert({ order_no: o.no, customer: o.cust, address: o.addr, items: o.items, subtotal: o.sub, discount: o.d, shipping: o.ship, total: o.total, discount_code: o.code, payment_method: o.pay, status: o.status, tracking: o.track, note: o.note, stock_deducted: o.stockDone, log: o.log });
+  await c.from('orders').insert({ order_no: o.no, customer: o.cust, address: o.addr, items: o.items, subtotal: o.sub, discount: o.d, shipping: o.ship, total: o.total, discount_code: o.code, payment_method: o.pay, status: o.status, tracking: o.track, note: o.note, stock_deducted: o.stockDone, log: o.log, user_id: (SB_USER && SB_USER.id) || null, customer_email: ((o.cust && o.cust.email) || '').toLowerCase() });
 }
 async function dbUpdateOrder(no, patch) { var c = sb(); if (!c) return; await c.from('orders').update(patch).eq('order_no', no); }
 async function dbSavePage() {
@@ -245,12 +265,13 @@ function dropInit() {
 /* ---------- admin: products ---------- */
 function fld(k, l, t, c) { var v = E[k]; if (Array.isArray(v)) v = v.join(', '); return '<label class="' + (c || '') + '">' + l + (t == 'ta' ? '<textarea data-k="' + k + '">' + esc(v) + '</textarea>' : '<input data-k="' + k + '" type="' + (t || 'text') + '" value="' + esc(v) + '">') + '</label>'; }
 function admin() {
-  var h = '<div class="top"><h1>Products</h1><button class="btn p" onclick="edit(-1)">New product</button></div>' + (sb() ? (SB_USER ? '<p class="sm">Supabase connected · ' + esc(SB_USER.email) + ' · <a href="#" onclick="sbLogout();return false" style="text-decoration:underline">logout</a></p>' : '<p class="sm">Supabase connected · <a href="#/admin/system/supabase" style="text-decoration:underline">login เป็น admin เพื่อเขียนข้อมูล</a> (อ่านได้อย่างเดียวตอนยังไม่ login)</p>') : '<div class="note">Local mode — ต่อ Supabase ที่เมนู SYSTEM › Supabase เพื่อแชร์ข้อมูลทั้งร้าน</div>');
+  var h = '<div class="top"><h1>Products</h1>' + (isOwner() ? '<button class="btn p" onclick="edit(-1)">New product</button>' : '<span class="sm">' + esc(roleLabel()) + (myRole() === 'shop_admin' ? ' · แก้ได้เฉพาะสต็อก' : '') + '</span>') + '</div>' + (sb() ? (SB_USER ? '<p class="sm">Supabase · ' + esc(SB_USER.email) + ' · ' + esc(roleLabel()) + ' · <a href="#" onclick="sbLogout();return false" style="text-decoration:underline">logout</a></p>' : '<p class="sm">Supabase connected · <a href="#/admin/system/supabase" style="text-decoration:underline">login เพื่อเขียนข้อมูล</a></p>') : '<div class="note">Local mode — ต่อ Supabase ที่เมนู SYSTEM › Supabase</div>');
   if (E) h += form();
-  h += '<div class="sc"><table class="tb"><tr><th>Product</th><th>SKU</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>' + P.map(function (p, i) { return '<tr><td>' + esc(p.name) + (p.featured ? ' <span class="sm">★</span>' : '') + '</td><td>' + esc(p.sku) + '</td><td>' + thb(p.price) + '</td><td' + (p.stock <= p.low ? ' style="color:var(--sd)"' : '') + '>' + p.stock + '</td><td><span class="bd ' + p.status + '">' + p.status + '</span></td><td><button class="btn s" onclick="edit(' + i + ')">Edit</button> <button class="btn s" onclick="arch(' + i + ')">' + (p.status == 'archived' ? 'Restore' : 'Archive') + '</button> <button class="btn s d" onclick="del(' + i + ')">Delete</button></td></tr>'; }).join('') + '</table></div>'; return h;
+  h += '<div class="sc"><table class="tb"><tr><th>Product</th><th>SKU</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>' + P.map(function (p, i) { return '<tr><td>' + esc(p.name) + (p.featured ? ' <span class="sm">★</span>' : '') + '</td><td>' + esc(p.sku) + '</td><td>' + thb(p.price) + '</td><td' + (p.stock <= p.low ? ' style="color:var(--sd)"' : '') + '>' + p.stock + '</td><td><span class="bd ' + p.status + '">' + p.status + '</span></td><td><button class="btn s" onclick="edit(' + i + ')">' + (myRole() === 'shop_admin' ? 'Stock' : 'Edit') + '</button>' + (isStaff() ? ' <button class="btn s" onclick="arch(' + i + ')">' + (p.status == 'archived' ? 'Restore' : 'Archive') + '</button>' : '') + (isOwner() ? ' <button class="btn s d" onclick="del(' + i + ')">Delete</button>' : '') + '</td></tr>'; }).join('') + '</table></div>'; return h;
 }
 function form() {
-  return '<div class="fm" id="fm">' + fld('name', 'Name', '', 'w2') + fld('sku', 'SKU') + fld('barcode', 'Barcode') +
+  var ro = myRole() === 'shop_admin' ? '<div class="note w4">Shop admin: แก้ได้เฉพาะ Stock / Low threshold / Status — ช่องอื่นจะถูกคงค่าเดิมตอนบันทึก</div>' : '';
+  return '<div class="fm" id="fm">' + ro + fld('name', 'Name', '', 'w2') + fld('sku', 'SKU') + fld('barcode', 'Barcode') +
     '<label>Category<select data-k="cat">' + CAT.map(function (c) { return '<option' + (E.cat == c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label>' + fld('coll', 'Collection') +
     '<label>Status<select data-k="status">' + ['active', 'draft', 'archived'].map(function (c) { return '<option' + (E.status == c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label>' +
     '<label>Featured<select data-k="featured"><option value="0">No</option><option value="1"' + (E.featured ? ' selected' : '') + '>Yes</option></select></label>' +
@@ -259,19 +280,26 @@ function form() {
 }
 function edit(i) { E = i < 0 ? mk('new-' + Date.now().toString(36), '', 'Apparel', 'Core', 0, 0, 0, 0, ['Black'], ['One size'], 0, '') : JSON.parse(JSON.stringify(P[i])); E._i = i; EI = (IM[E.id] || []).slice(); if (i < 0) { E.status = 'draft'; E.sku = ''; } go(); var f = $('#fm'); f && f.scrollIntoView({ behavior: 'smooth' }); }
 async function commit() {
+  if (!isStaff()) { T('ต้อง login เป็น staff'); return; }
+  if (!isOwner() && myRole() === 'shop_admin' && arguments.length === 0) { /* stock-only enforced below */ }
   var o = JSON.parse(JSON.stringify(E)), i = o._i; delete o._i;
   document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k, v = e.value; if (['price', 'compare', 'cost', 'stock', 'low'].indexOf(k) > -1) v = Math.max(0, parseInt(v, 10) || 0); else if (k == 'colors' || k == 'sizes') v = v.split(',').map(function (x) { return x.trim(); }).filter(Boolean); else if (k == 'featured') v = v == '1' ? 1 : 0; o[k] = v; });
   if (!o.name.trim()) { T('Enter a product name'); return; }
   if (!o.colors.length) o.colors = ['Black']; if (!o.sizes.length) o.sizes = ['One size'];
   if (o._new !== false && i < 0) o.id = 'p-' + Date.now().toString(36);
   if (!o.sku.trim()) o.sku = o.id.toUpperCase();
+  if (myRole() === 'shop_admin' && i >= 0) {
+    // shop_admin แก้ได้เฉพาะ stock/low/status — คงค่าอื่นจากของเดิม
+    var keep = P[i]; ['name', 'sku', 'barcode', 'cat', 'coll', 'price', 'compare', 'cost', 'featured', 'colors', 'sizes', 'tags', 'desc', 'spec', 'material', 'dims', 'notes'].forEach(function (k) { o[k] = keep[k]; });
+  }
+  if (i < 0 && myRole() === 'shop_admin') { T('สร้างสินค้าได้เฉพาะ owner'); return; }
   if (i < 0) P.push(o); else { o.id = P[i].id; P[i] = o; }
   IM[o.id] = EI.slice(0, 4);
   saveLocal(); await dbUpsertProduct(o);
   E = null; T('Saved'); go();
 }
-async function arch(i) { P[i].status = P[i].status == 'archived' ? 'draft' : 'archived'; saveLocal(); await dbUpsertProduct(P[i]); go(); }
-async function del(i) { if (!confirm('Delete "' + P[i].name + '"?')) return; var id = P[i].id; P.splice(i, 1); delete IM[id]; saveLocal(); await dbDeleteProduct(id); go(); }
+async function arch(i) { if (!isStaff()) { T('ต้อง login เป็น staff'); return; } P[i].status = P[i].status == 'archived' ? 'draft' : 'archived'; saveLocal(); await dbUpsertProduct(P[i]); go(); }
+async function del(i) { if (!isOwner()) { T('ลบสินค้าได้เฉพาะ owner'); return; } if (!confirm('Delete "' + P[i].name + '"?')) return; var id = P[i].id; P.splice(i, 1); delete IM[id]; saveLocal(); await dbDeleteProduct(id); go(); }
 
 /* ---------- images (Storage-first) ---------- */
 function sync() { document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k; E[k] = k == 'featured' ? (e.value == '1' ? 1 : 0) : e.value; }); }
@@ -330,6 +358,7 @@ async function hup(i, fs) {
   HS.slides[i].img = r.dataUrl; redraw();
 }
 async function hsave() {
+  if (!isOwner()) { T('แก้หน้าเว็บได้เฉพาะ owner'); return; }
   H = JSON.parse(JSON.stringify(HS));
   try { localStorage.setItem('jg_home', JSON.stringify(H)); } catch (e) {}
   await dbSavePage(); T('Homepage saved');
@@ -352,7 +381,7 @@ function adminSec() {
   x += '<div class="fm">' + h3('Shipping') + pin('ship.rate', 'Flat rate', 'number', 'w2') + pin('ship.free', 'Free above', 'number', 'w2') + '</div>';
   return '<div class="top"><h1>Sections</h1><button class="btn p" onclick="psave()">Save sections</button></div>' + x;
 }
-async function psave() { PG = JSON.parse(JSON.stringify(PGS)); try { localStorage.setItem('jg_page', JSON.stringify(PG)); } catch (e) {} await dbSavePage(); T('Sections saved'); }
+async function psave() { if (!isOwner()) { T('แก้ sections ได้เฉพาะ owner'); return; } PG = JSON.parse(JSON.stringify(PGS)); try { localStorage.setItem('jg_page', JSON.stringify(PG)); } catch (e) {} await dbSavePage(); T('Sections saved'); }
 
 /* ---------- admin: orders / customers / dashboard ---------- */
 function adminOrd() {
@@ -369,24 +398,27 @@ function adminOrd() {
   return h + '</table></div><p class="sm">Stock ตัดเมื่อ mark paid</p>';
 }
 async function ost(no, v) {
-  var o = ORDS[no]; o.status = v; o.log.push({ t: new Date().toISOString(), s: 'Status → ' + v });
+  if (!isStaff()) { T('ต้อง login เป็น staff'); return; }
+  var o = ORDS[no]; o.status = v; o.log.push({ t: new Date().toISOString(), s: 'Status → ' + v + ' by ' + myRole() });
   if (v == 'paid' && !o.stockDone) { o.items.forEach(function (l) { var p = gp(l.id); if (p) p.stock = Math.max(0, p.stock - l.qty); }); o.stockDone = 1; P.forEach(function (p) { dbUpsertProduct(p); }); saveLocal(); }
   try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
   await dbUpdateOrder(no, { status: v, tracking: o.track, note: o.note, log: o.log, stock_deducted: o.stockDone ? 1 : 0 });
   go();
 }
-async function oset(no, k, v) { ORDS[no][k] = v; try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {} var patch = {}; patch[k == 'track' ? 'tracking' : k] = v; await dbUpdateOrder(no, patch); T('Saved'); }
+async function oset(no, k, v) { if (!isStaff()) { T('ต้อง login เป็น staff'); return; } ORDS[no][k] = v; try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {} var patch = {}; patch[k == 'track' ? 'tracking' : k] = v; await dbUpdateOrder(no, patch); T('Saved'); }
 
 /* ---------- admin shell ---------- */
 function jtNav(active) {
-  var groups = [
-    ['STORE', [['Home', '#/'], ['Shop', '#/shop'], ['Product', '#/product'], ['Cart', '#/cart'], ['Checkout', '#/checkout'], ['Order Complete', '#/order-complete']]],
-    ['ADMIN', [['Dashboard', '#/admin/dashboard'], ['Products', '#/admin/products'], ['Inventory', '#/admin/inventory'], ['Orders', '#/admin/orders'], ['Customers', '#/admin/customers']]],
-    ['WEBSITE', [['Homepage', '#/admin/website/homepage'], ['Sections', '#/admin/website/sections']]],
-    ['SETTINGS', [['General', '#/admin/settings/general'], ['Shipping', '#/admin/settings/shipping'], ['Payment', '#/admin/settings/payment'], ['Contact', '#/admin/settings/contact'], ['SEO', '#/admin/settings/seo'], ['Maintenance', '#/admin/settings/maintenance']]],
-    ['SYSTEM', [['Supabase', '#/admin/system/supabase'], ['Staff & Roles', '#/admin/system/staff'], ['Activity Log', '#/admin/system/activity']]]
-  ];
-  var h = '<aside class="jt-side"><div class="jt-brand"><a href="#/" style="font-weight:800">JUNGRAI TACT</a><div class="jgt-muted">' + (sb() ? '● Supabase' : '○ local') + '</div></div>';
+  var store = [['Home', '#/'], ['Shop', '#/shop'], ['Product', '#/product'], ['Cart', '#/cart'], ['Checkout', '#/checkout'], ['Order Complete', '#/order-complete']];
+  if (SB_USER) store.push(['My Orders', '#/account/orders']);
+  var groups = [['STORE', store]];
+  if (isStaff()) groups.push(['ADMIN', [['Dashboard', '#/admin/dashboard'], ['Products', '#/admin/products'], ['Inventory', '#/admin/inventory'], ['Orders', '#/admin/orders'], ['Customers', '#/admin/customers']]]);
+  if (isOwner()) {
+    groups.push(['WEBSITE', [['Homepage', '#/admin/website/homepage'], ['Sections', '#/admin/website/sections']]]);
+    groups.push(['SETTINGS', [['General', '#/admin/settings/general'], ['Shipping', '#/admin/settings/shipping'], ['Payment', '#/admin/settings/payment'], ['Contact', '#/admin/settings/contact'], ['SEO', '#/admin/settings/seo'], ['Maintenance', '#/admin/settings/maintenance']]]);
+  }
+  groups.push(['SYSTEM', [['Supabase', '#/admin/system/supabase'], ['Staff & Roles', '#/admin/system/staff'], ['Activity Log', '#/admin/system/activity']]]);
+  var h = '<aside class="jt-side"><div class="jt-brand"><a href="#/" style="font-weight:800">JUNGRAI TACT</a><div class="jgt-muted">' + (sb() ? '● Supabase · ' + esc(roleLabel()) : '○ local · owner') + '</div></div>';
   groups.forEach(function (g) { h += '<div class="jt-group">' + g[0] + '</div>'; g[1].forEach(function (x) { h += '<a href="' + x[1] + '" class="' + (active === x[1] ? 'active' : '') + '">' + x[0] + '</a>'; }); });
   return h + '</aside>';
 }
@@ -410,18 +442,31 @@ window.jtSaveSettings = function (section) {
 };
 function jtDashboard() {
   var os = Object.keys(ORDS).map(function (k) { return ORDS[k]; }), sales = os.filter(function (o) { return !['cancelled', 'refunded'].includes(o.status); }).reduce(function (a, o) { return a + Number(o.total || 0); }, 0), pending = os.filter(function (o) { return ['new'].includes(o.status); }).length;
-  return jtShell('Dashboard', '#/admin/dashboard', '<div class="jt-grid"><div class="jt-kpi"><span>Products</span><b>' + P.length + '</b></div><div class="jt-kpi"><span>Orders</span><b>' + os.length + '</b></div><div class="jt-kpi"><span>Sales</span><b>' + bt(sales) + '</b></div><div class="jt-kpi"><span>Pending</span><b>' + pending + '</b></div></div><div class="jt-panel"><span class="jgt-kpi">Mode</span><p>' + (sb() ? 'Supabase live: ' + esc(SB.url) : 'Local mode — ตั้งค่า Supabase ที่ SYSTEM › Supabase') + '</p></div>');
+  return jtShell('Dashboard', '#/admin/dashboard', '<div class="jt-grid"><div class="jt-kpi"><span>Products</span><b>' + P.length + '</b></div><div class="jt-kpi"><span>Orders</span><b>' + os.length + '</b></div><div class="jt-kpi"><span>Sales</span><b>' + bt(sales) + '</b></div><div class="jt-kpi"><span>Role</span><b style="font-size:20px">' + esc(roleLabel()) + '</b></div></div><div class="jt-panel"><span class="jgt-kpi">Mode</span><p>' + (sb() ? 'Supabase live: ' + esc(SB.url) + ' · ' + esc(SB_USER ? SB_USER.email : 'guest') : 'Local mode — ตั้งค่า Supabase ที่ SYSTEM › Supabase') + '</p></div>');
 }
 function jtInventory() { return jtShell('Inventory', '#/admin/inventory', '<div class="jt-panel"><table class="tb"><tr><th>Product</th><th>SKU</th><th>Stock</th><th>Status</th></tr>' + P.map(function (p) { var n2 = Number(p.stock || 0); return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.sku) + '</td><td>' + n2 + '</td><td>' + (n2 <= 0 ? 'OUT' : n2 <= Number(p.low || 5) ? 'LOW' : 'IN') + '</td></tr>'; }).join('') + '</table></div>'); }
 function jtCustomers() {
   var map = {}; Object.keys(ORDS).forEach(function (k) { var o = ORDS[k], c = o.cust || {}; var key = String(c.email || 'guest:' + o.no).toLowerCase(); if (!map[key]) map[key] = { name: c.name || 'Guest', email: c.email || '', phone: c.phone || '', orders: 0, total: 0 }; map[key].orders++; map[key].total += Number(o.total || 0); });
   return jtShell('Customers', '#/admin/customers', '<div class="jt-panel"><table class="tb"><tr><th>Name</th><th>Email</th><th>Phone</th><th>Orders</th><th>Total</th></tr>' + Object.keys(map).map(function (k) { var c = map[k]; return '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.phone) + '</td><td>' + c.orders + '</td><td>' + bt(c.total) + '</td></tr>'; }).join('') + '</table></div>');
 }
-function jtStaff() { return jtShell('Staff & Roles', '#/admin/system/staff', '<div class="jt-panel"><table class="tb"><tr><th>Role</th><th>Products</th><th>Orders</th><th>Website</th></tr><tr><td>Owner</td><td>Full</td><td>Full</td><td>Full</td></tr><tr><td>Manager</td><td>Edit</td><td>Manage</td><td>Edit</td></tr><tr><td>Fulfillment</td><td>View</td><td>Process</td><td>—</td></tr></table><p class="jgt-muted">Auth จริงจัดการที่ Supabase Dashboard › Authentication › Users</p></div>'); }
+function jtStaff() {
+  var rows = SB_PROFILES.map(function (u) { return '<tr><td>' + esc(u.email) + '</td><td><span class="bd">' + esc(u.role) + '</span></td><td style="text-align:right">' + (isOwner() && SB_USER && u.id !== SB_USER.id ? '<select onchange="sbSetRole(\'' + u.id + '\',this.value)">' + ['member', 'shop_admin', 'owner'].map(function (r) { return '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select>' : '<span class="sm">you</span>') + '</td></tr>'; }).join('');
+  return jtShell('Staff & Roles', '#/admin/system/staff', '<div class="jt-panel"><p class="sm">Owner ทำได้ทุกอย่าง · Shop admin เติมสต็อก+จัดการออเดอร์ (แก้ราคา/ลบ/แก้เว็บไม่ได้) · Member ดูออเดอร์ตัวเอง · Guest สั่งซื้อได้อย่างเดียว</p><div style="margin:12px 0"><button class="btn s" onclick="sbLoadProfiles()">Reload users</button></div><table class="tb"><tr><th>Email</th><th>Role</th><th></th></tr>' + (rows || '<tr><td colspan="3">ยังไม่มีข้อมูล — กด Reload (ต้องรัน migration_roles.sql + login เป็น owner)</td></tr>') + '</table><p class="jgt-muted">เปลี่ยน role ได้เฉพาะ owner · user ใหม่สมัครมาจะเป็น member อัตโนมัติ · ตั้ง owner คนแรกด้วย SQL: update profiles set role=\'owner\' where email=\'...\'</p></div>');
+}
+window.sbSetRole = async function (id, role) {
+  if (!isOwner()) { T('เปลี่ยน role ได้เฉพาะ owner'); return; }
+  var c = sb(); var r = await c.from('profiles').update({ role: role }).eq('id', id);
+  if (r.error) T(r.error.message); else { T('Updated to ' + role); sbLoadProfiles(); }
+};
+window.sbLoadProfiles = async function () {
+  var c = sb(); if (!c || !isStaff()) { T('ต้อง login เป็น staff'); return; }
+  var r = await c.from('profiles').select('id,email,role').order('created_at');
+  if (!r.error && r.data) { SB_PROFILES = r.data; go(); } else T((r.error && r.error.message) || 'load failed');
+};
 function jtActivity() { return jtShell('Activity Log', '#/admin/system/activity', '<div class="jt-panel"><p>ต้องมี backend จริง — ตอนนี้ดู log ใน Supabase › Table Editor › activity_log</p></div>'); }
 function jtSupabase() {
   var ls = {}; try { ls = JSON.parse(localStorage.getItem('jt_supabase') || '{}'); } catch (e) {}
-  return jtShell('Supabase', '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Supabase URL<input id="sb_url" value="' + esc(ls.url || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_URL) || '')) + '" placeholder="https://xyz.supabase.co"></label><label class="full">Anon key<input id="sb_key" value="' + esc(ls.key || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || '')) + '" placeholder="eyJ..."></label><label class="full">Admin email (สำหรับ login เขียนข้อมูล)<input id="sb_email" placeholder="owner@jungrai.com"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbSave()">Save & connect</button><button class="btn" onclick="sbLogin()">Send magic link</button><button class="btn" onclick="sbLogout()">Logout</button>' + (sb() ? '<button class="btn d" onclick="SBClear()">Disconnect</button>' : '') + '</div><p class="jgt-muted" style="margin-top:12px">สถานะ: ' + (sb() ? 'connected → ' + esc(SB.url) + (SB_USER ? ' · login: ' + esc(SB_USER.email) : ' · ยังไม่ login (อ่านได้อย่างเดียว)') : 'ยังไม่ต่อ — ร้านทำงานแบบ local ไปก่อน') + '</p><p class="jgt-muted">1) สร้าง project ที่ supabase.com → 2) SQL Editor รัน supabase/schema.sql + seed.sql → 3) เอา URL + anon key มากรอกที่นี่ → 4) Authentication › Add user (อีเมลตัวเอง) → 5) login ด้วย magic link</p></div>');
+  return jtShell('Supabase', '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Supabase URL<input id="sb_url" value="' + esc(ls.url || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_URL) || '')) + '" placeholder="https://xyz.supabase.co"></label><label class="full">Anon key<input id="sb_key" value="' + esc(ls.key || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || '')) + '" placeholder="eyJ..."></label><label class="full">Admin email (สำหรับ login เขียนข้อมูล)<input id="sb_email" placeholder="owner@jungrai.com"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbSave()">Save & connect</button><button class="btn" onclick="sbLogin()">Send magic link</button><button class="btn" onclick="sbLogout()">Logout</button>' + (sb() ? '<button class="btn d" onclick="SBClear()">Disconnect</button>' : '') + '</div><p class="jgt-muted" style="margin-top:12px">สถานะ: ' + (sb() ? 'connected → ' + esc(SB.url) + (SB_USER ? ' · ' + esc(SB_USER.email) + ' · ' + esc(roleLabel()) : ' · guest (สั่งซื้อได้อย่างเดียว)') : 'ยังไม่ต่อ — local = สิทธิ์ owner') + '</p><p class="jgt-muted">รัน supabase/schema.sql + seed.sql + migration_roles.sql → Authentication › Add user → SQL: update profiles set role=\'owner\' where email=\'...\' → login ด้วย email นี้</p></div>');
 }
 window.sbSave = function () { var u = document.getElementById('sb_url').value.trim(), k = document.getElementById('sb_key').value.trim(); if (!u || !k) { T('กรอก URL + key'); return; } SB.saveConn(u, k); };
 window.SBClear = function () { SB.clearConn(); };
@@ -431,12 +476,21 @@ window.sbLogin = async function () {
   var r = await c.auth.signInWithOtp({ email: em.trim() });
   if (r.error) T(r.error.message); else T('ส่งลิงก์ login ไปที่ ' + em + ' แล้ว');
 };
-window.sbLogout = async function () { var c = sb(); if (c) await c.auth.signOut(); SB_USER = null; T('Logged out'); go(); };
+window.sbLogout = async function () { var c = sb(); if (c) await c.auth.signOut(); SB_USER = null; SB_ROLE = 'guest'; SB_PROFILES = []; T('Logged out'); go(); };
 
 /* ---------- misc views ---------- */
 function tcur() { CUR = CUR == 'THB' ? 'USD' : 'THB'; try { localStorage.setItem('jg_cur', CUR); } catch (e) {} go(); }
 function applyLogo() { cnt(); var cu = document.getElementById('cur'); if (cu) cu.textContent = CUR; }
 function hc() { var m = (location.hash || '').match(/^#\/shop\?cat=(.+)$/); if (m) F.cat = decodeURIComponent(m[1]); }
+
+/* ---------- account: my orders (member) ---------- */
+function myOrdersView() {
+  if (!SB_USER) return jtShell('My Orders', '#/account/orders', '<div class="jt-panel"><p>Login ก่อนเพื่อดูออเดอร์ของตัวเอง</p><a class="btn p" href="#/admin/system/supabase">Login</a></div>');
+  var L = Object.keys(ORDS).map(function (k) { return ORDS[k]; }).sort(function (a, b) { return a.at < b.at ? 1 : -1; });
+  if (!L.length) return jtShell('My Orders', '#/account/orders', '<div class="jt-panel"><p>ยังไม่มีออเดอร์</p><a class="btn p" href="#/shop">Shop now</a></div>');
+  return jtShell('My Orders', '#/account/orders', '<div class="jt-panel"><table class="tb"><tr><th>Order</th><th>Date</th><th>Total</th><th>Status</th></tr>' + L.map(function (o) { return '<tr><td>' + esc(o.no) + '</td><td>' + new Date(o.at).toLocaleDateString('en-GB') + '</td><td>' + bt(o.total) + '</td><td>' + esc(o.status) + '</td></tr>'; }).join('') + '</table></div>');
+}
+function deny(page) { return jtShell(page, location.hash, '<div class="jt-panel"><p>สิทธิ์ไม่ถึง (' + esc(roleLabel()) + ') — หน้านี้ต้องเป็น ' + esc(page === 'Owner only' ? 'owner' : 'staff') + '</p><a class="btn p" href="#/admin/system/supabase">Login / เปลี่ยน user</a></div>'); }
 
 /* ---------- router ---------- */
 function go() {
@@ -444,14 +498,15 @@ function go() {
   var h = location.hash || '#/', m = h.match(/^#\/p\/(.+)$/), m2 = h.match(/^#\/done\/(.+)$/), a = $('#app'), isH = h == '#/' || h == '#';
   document.querySelector('main').className = isH ? 'h' : '';
   var v;
-  if (h === '#/admin' || h === '#/admin/dashboard') v = jtDashboard();
-  else if (h === '#/admin/products') v = jtShell('Products', '#/admin/products', admin());
-  else if (h === '#/admin/inventory') v = jtInventory();
-  else if (h === '#/admin/orders') v = jtShell('Orders', '#/admin/orders', adminOrd());
-  else if (h === '#/admin/customers') v = jtCustomers();
-  else if (h === '#/admin/website/homepage') v = jtShell('Homepage', '#/admin/website/homepage', adminHome());
-  else if (h === '#/admin/website/sections') v = jtShell('Sections', '#/admin/website/sections', adminSec());
-  else if (/^#\/admin\/settings\//.test(h)) v = jtSettings(h.split('/')[3]);
+  if (h === '#/account/orders') v = myOrdersView();
+  else if (h === '#/admin' || h === '#/admin/dashboard') v = isStaff() ? jtDashboard() : deny('Staff only');
+  else if (h === '#/admin/products') v = isStaff() ? jtShell('Products', '#/admin/products', admin()) : deny('Staff only');
+  else if (h === '#/admin/inventory') v = isStaff() ? jtInventory() : deny('Staff only');
+  else if (h === '#/admin/orders') v = isStaff() ? jtShell('Orders', '#/admin/orders', adminOrd()) : deny('Staff only');
+  else if (h === '#/admin/customers') v = isStaff() ? jtCustomers() : deny('Staff only');
+  else if (h === '#/admin/website/homepage') v = isOwner() ? jtShell('Homepage', '#/admin/website/homepage', adminHome()) : deny('Owner only');
+  else if (h === '#/admin/website/sections') v = isOwner() ? jtShell('Sections', '#/admin/website/sections', adminSec()) : deny('Owner only');
+  else if (/^#\/admin\/settings\//.test(h)) v = isOwner() ? jtSettings(h.split('/')[3]) : deny('Owner only');
   else if (h === '#/admin/system/supabase') v = jtSupabase();
   else if (h === '#/admin/system/staff') v = jtStaff();
   else if (h === '#/admin/system/activity') v = jtActivity();
@@ -472,7 +527,17 @@ window.addEventListener('hashchange', function () { Q = 1; SEL = {}; E = null; H
 loadLocal(); hc(); go();
 (async function () {
   var ok = await loadSupabase();
+  if (isStaff()) await sbLoadProfilesSilent();
   if (ok) go();
   var c = sb();
-  if (c) c.auth.onAuthStateChange(function (ev, session) { SB_USER = session ? session.user : null; if (location.hash.indexOf('#/admin') === 0) go(); });
+  if (c) c.auth.onAuthStateChange(function (ev, session) {
+    SB_USER = session ? session.user : null;
+    loadRole().then(function () {
+      if (isStaff() && sb()) sbLoadProfilesSilent();
+      go();
+    });
+  });
 })();
+async function sbLoadProfilesSilent() {
+  try { var c = sb(); if (!c || !isStaff()) return; var r = await c.from('profiles').select('id,email,role').order('created_at'); if (!r.error && r.data) SB_PROFILES = r.data; } catch (e) {}
+}
