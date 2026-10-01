@@ -33,6 +33,21 @@ var IM = {}; // id -> [imageUrl,...] (http หรือ dataURL)
 var H = { slides: JSON.parse(JSON.stringify(SEED_SLIDES)), secs: 7, logo: 1, wm: 1 };
 var PG = JSON.parse(JSON.stringify(DEFAULT_PAGE));
 var CART = [], DC = '', ORDS = {}, CUR = 'THB', OO = '';
+var LANG = 'TH'; // TH | EN
+try { LANG = localStorage.getItem('jt_lang') || 'TH'; } catch (e) {}
+function t(th, en) { return LANG === 'TH' ? th : en; }
+function tlang() { LANG = LANG === 'TH' ? 'EN' : 'TH'; try { localStorage.setItem('jt_lang', LANG); } catch (e) {} applyHeader(); go(); }
+function applyHeader() {
+  try { document.documentElement.lang = LANG === 'TH' ? 'th' : 'en'; } catch (e) {}
+  var set = function (id, v) { var e = document.getElementById(id); if (e) e.textContent = v; };
+  set('nh', t('หน้าแรก', 'HOME')); set('ns', t('ร้านค้า', 'SHOP')); set('nct', t('ตะกร้า', 'CART')); set('lng', LANG === 'TH' ? 'EN' : 'TH');
+  var lg = document.getElementById('lg');
+  if (lg) {
+    if (!sb() || !SB_USER) { lg.textContent = t('เข้าสู่ระบบ', 'LOGIN'); lg.href = '#/admin/system/supabase'; }
+    else if (isStaff()) { lg.textContent = t('หลังร้าน', 'ADMIN'); lg.href = '#/admin/dashboard'; }
+    else { lg.textContent = t('บัญชีของฉัน', 'ACCOUNT'); lg.href = '#/account/orders'; }
+  }
+}
 var STS = ['new', 'paid', 'processing', 'packed', 'shipped', 'delivered', 'cancelled', 'refunded'];
 var F = { cat: '', size: '', color: '', av: '', sort: 'featured' };
 var Q = 1, SEL = {}, E = null, EI = [], HS = null, PGS = null, HT = null, HT2 = null, HK = 0;
@@ -153,11 +168,11 @@ function shop() {
   var sizes = {}, cols = {}; list().forEach(function (p) { p.sizes.forEach(function (x) { sizes[x] = 1; }); p.colors.forEach(function (x) { cols[x] = 1; }); });
   var r = list().filter(function (p) { return (!F.cat || p.cat == F.cat) && (!F.size || p.sizes.indexOf(F.size) > -1) && (!F.color || p.colors.indexOf(F.color) > -1) && (!F.av || (F.av == 'in' ? p.stock > 0 : p.stock <= 0)); });
   if (F.sort == 'lo') r.sort(function (a, b) { return a.price - b.price; }); else if (F.sort == 'hi') r.sort(function (a, b) { return b.price - a.price; }); else if (F.sort == 'new') r.reverse(); else r.sort(function (a, b) { return b.featured - a.featured; });
-  function sel(k, l, o) { return '<label><span class="sm">' + l + '</span><select onchange="F.' + k + '=this.value;go()"><option value="">All</option>' + o.map(function (x) { return '<option' + (F[k] == x[0] ? ' selected' : '') + ' value="' + esc(x[0]) + '">' + esc(x[1]) + '</option>'; }).join('') + '</select></label>'; }
-  return '<div class="top"><h1>Collection</h1><span class="sm">' + r.length + ' products' + (sb() ? ' · live from Supabase' : ' · local mode') + '</span></div><div class="fl">' +
-    sel('cat', 'Category', CAT.map(function (x) { return [x, x]; })) + sel('size', 'Size', Object.keys(sizes).map(function (x) { return [x, x]; })) + sel('color', 'Color', Object.keys(cols).map(function (x) { return [x, x]; })) +
-    sel('av', 'Availability', [['in', 'In stock'], ['out', 'Sold out']]) + '<label><span class="sm">Sort</span><select onchange="F.sort=this.value;go()">' + [['featured', 'Featured'], ['new', 'Newest'], ['lo', 'Price low-high'], ['hi', 'Price high-low']].map(function (x) { return '<option value="' + x[0] + '"' + (F.sort == x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label></div>' +
-    (r.length ? '<div class="gr">' + r.map(function (p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p.id) + '" class="pn">' + pic(p, 0) + '</a><div class="in"><h3>' + esc(p.name) + '</h3><div class="row"><span>' + thb(p.price) + (p.compare > p.price ? ' <s style="color:var(--cn)">' + thb(p.compare) + '</s>' : '') + '</span><span class="dots">' + p.colors.map(function (c) { return '<i title="' + esc(c) + '" style="background:' + (CM[c] || '#555') + '"></i>'; }).join('') + '</span></div><div class="row"><span class="av ' + a[0] + '"><b></b>' + a[1] + '</span>' + (p.stock > 0 ? '<button class="btn s" onclick="qadd(\'' + esc(p.id) + '\')">Quick add</button>' : '') + '</div></div></div>'; }).join('') + '</div>' : '<p>No products match these filters.</p>');
+  function sel(k, l, o) { return '<label><span class="sm">' + l + '</span><select onchange="F.' + k + '=this.value;go()"><option value="">' + t('ทั้งหมด', 'All') + '</option>' + o.map(function (x) { return '<option' + (F[k] == x[0] ? ' selected' : '') + ' value="' + esc(x[0]) + '">' + esc(x[1]) + '</option>'; }).join('') + '</select></label>'; }
+  return '<div class="top"><h1>' + t('คอลเลกชัน', 'Collection') + '</h1><span class="sm">' + r.length + ' ' + t('สินค้า', 'products') + (sb() ? ' · live' : ' · local') + '</span></div><div class="fl">' +
+    sel('cat', t('หมวด', 'Category'), CAT.map(function (x) { return [x, x]; })) + sel('size', t('ไซส์', 'Size'), Object.keys(sizes).map(function (x) { return [x, x]; })) + sel('color', t('สี', 'Color'), Object.keys(cols).map(function (x) { return [x, x]; })) +
+    sel('av', t('สถานะ', 'Availability'), [['in', t('มีของ', 'In stock')], ['out', t('หมด', 'Sold out')]]) + '<label><span class="sm">' + t('เรียง', 'Sort') + '</span><select onchange="F.sort=this.value;go()">' + [['featured', t('แนะนำ', 'Featured')], ['new', t('ใหม่สุด', 'Newest')], ['lo', t('ถูก→แพง', 'Price low-high')], ['hi', t('แพง→ถูก', 'Price high-low')]].map(function (x) { return '<option value="' + x[0] + '"' + (F.sort == x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label></div>' +
+    (r.length ? '<div class="gr">' + r.map(function (p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p.id) + '" class="pn">' + pic(p, 0) + '</a><div class="in"><h3>' + esc(p.name) + '</h3><div class="row"><span>' + thb(p.price) + (p.compare > p.price ? ' <s style="color:var(--cn)">' + thb(p.compare) + '</s>' : '') + '</span><span class="dots">' + p.colors.map(function (c) { return '<i title="' + esc(c) + '" style="background:' + (CM[c] || '#555') + '"></i>'; }).join('') + '</span></div><div class="row"><span class="av ' + a[0] + '"><b></b>' + a[1] + '</span>' + (p.stock > 0 ? '<button class="btn s" onclick="qadd(\'' + esc(p.id) + '\')">' + t('หยิบใส่ตะกร้า', 'Quick add') + '</button>' : '') + '</div></div></div>'; }).join('') + '</div>' : '<p>' + t('ไม่พบสินค้าตามเงื่อนไข', 'No products match these filters.') + '</p>');
 }
 var n = 0;
 function qadd(id) { var p = gp(id); cadd(id, p.colors[0], p.sizes[0], 1); }
@@ -165,15 +180,15 @@ function qadd(id) { var p = gp(id); cadd(id, p.colors[0], p.sizes[0], 1); }
 /* ---------- product ---------- */
 function prod(id) {
   var p = P.filter(function (x) { return x.id == id; })[0];
-  if (!p || p.status != 'active') return '<p>This product is not available. <a href="#/shop" style="text-decoration:underline">Back to collection</a></p>';
+  if (!p || p.status != 'active') return '<p>' + t('สินค้านี้ไม่พร้อมขาย', 'This product is not available.') + ' <a href="#/shop" style="text-decoration:underline">' + t('กลับไปดูสินค้า', 'Back to collection') + '</a></p>';
   SEL.c = SEL.c && p.colors.indexOf(SEL.c) > -1 ? SEL.c : p.colors[0]; SEL.s = SEL.s && p.sizes.indexOf(SEL.s) > -1 ? SEL.s : p.sizes[0]; var a = av(p);
   function dt(t, x, d) { return '<details><summary>' + t + '</summary><p>' + esc(x || d || 'Details will be added soon.') + '</p></details>'; }
   return '<p class="sm" style="margin-bottom:20px"><a href="#/shop">Collection</a> / ' + esc(p.cat) + '</p><div class="pp">' + gal(p) +
     '<div class="pi"><span class="sm">' + esc(p.coll) + '</span><h1>' + esc(p.name) + '</h1><div class="price">' + thb(p.price) + (p.compare > p.price ? '<s>' + thb(p.compare) + '</s>' : '') + '</div><p style="color:#b9b8ae">' + esc(p.desc) + '</p>' +
-    '<div><span class="sm">Color — ' + esc(SEL.c) + '</span><div class="opt">' + p.colors.map(function (c) { return '<button class="sw" aria-label="' + esc(c) + '" aria-pressed="' + (c == SEL.c) + '" onclick="SEL.c=\'' + esc(c) + '\';go()"><i style="background:' + (CM[c] || '#555') + '"></i></button>'; }).join('') + '</div></div>' +
-    '<div><span class="sm">Size</span><div class="opt">' + p.sizes.map(function (s) { return '<button aria-pressed="' + (s == SEL.s) + '" onclick="SEL.s=\'' + esc(s) + '\';go()">' + esc(s) + '</button>'; }).join('') + '</div></div>' +
+    '<div><span class="sm">' + t('สี', 'Color') + ' — ' + esc(SEL.c) + '</span><div class="opt">' + p.colors.map(function (c) { return '<button class="sw" aria-label="' + esc(c) + '" aria-pressed="' + (c == SEL.c) + '" onclick="SEL.c=\'' + esc(c) + '\';go()"><i style="background:' + (CM[c] || '#555') + '"></i></button>'; }).join('') + '</div></div>' +
+    '<div><span class="sm">' + t('ไซส์', 'Size') + '</span><div class="opt">' + p.sizes.map(function (s) { return '<button aria-pressed="' + (s == SEL.s) + '" onclick="SEL.s=\'' + esc(s) + '\';go()">' + esc(s) + '</button>'; }).join('') + '</div></div>' +
     '<div class="av ' + a[0] + '"><b></b>' + a[1] + '</div><div class="qty"><button aria-label="Less" onclick="Q=Math.max(1,Q-1);go()">–</button><span>' + Q + '</span><button aria-label="More" onclick="Q++;go()">+</button></div>' +
-    (p.stock > 0 ? '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn p" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ')">Add to cart</button><button class="btn" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ',1);location.hash=\'#/checkout\'">Buy now</button></div>' : '<button class="btn" disabled style="opacity:.5">Sold out</button>') +
+    (p.stock > 0 ? '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn p" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ')">' + t('หยิบใส่ตะกร้า', 'Add to cart') + '</button><button class="btn" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ',1);location.hash=\'#/checkout\'">' + t('ซื้อเลย', 'Buy now') + '</button></div>' : '<button class="btn" disabled style="opacity:.5">' + t('หมด', 'Sold out') + '</button>') +
     '<div style="margin-top:12px">' + dt('Description', p.desc) + dt('Specifications', p.spec) + dt('Material', p.material) + dt('Dimensions', p.dims) + dt('Field notes', p.notes) + dt('Care', 'Machine wash cold, hang dry. Do not bleach.') + dt('Shipping', 'Ships within 1–2 business days across Thailand.') + dt('Returns', 'Unused items can be returned within 14 days.') + '</div></div></div>';
 }
 
@@ -197,23 +212,23 @@ function calc() {
 function dapply() { var v = ($('#dc').value || '').trim().toUpperCase(); DC = ''; if (v) { if (PG.codes.some(function (x) { return String(x.c).toUpperCase() == v; })) { DC = v; T('Code applied'); } else T('Code not found'); } go(); }
 function ln(l, v, b) { return '<div class="row"' + (b ? ' style="font:700 24px var(--hd);letter-spacing:.04em;border-top:1px solid var(--ln);padding-top:10px"' : '') + '><span>' + l + '</span><span>' + v + '</span></div>'; }
 function sumbox(r, cart) {
-  return '<div style="display:grid;gap:10px;' + (cart ? 'max-width:420px;margin:32px 0 0 auto' : '') + '">' + (cart ? '<div style="display:flex;gap:8px"><input id="dc" placeholder="Discount code" value="' + esc(DC) + '" style="flex:1"><button class="btn s" onclick="dapply()">Apply</button></div>' : '') + ln('Subtotal', thb(r.sub)) + (r.d ? ln('Discount' + (DC ? ' (' + esc(DC) + ')' : ''), '– ' + thb(r.d)) : '') + (DC && r.code && r.code.t == 'ship' ? ln('Discount (' + esc(DC) + ')', 'Free shipping') : '') + ln('Shipping (Thailand, estimate)', r.ship ? thb(r.ship) : 'Free') + ln('Total', thb(r.total), 1) + (cart ? '<a class="btn p" style="text-align:center" href="#/checkout">Checkout</a>' : '') + '</div>';
+  return '<div style="display:grid;gap:10px;' + (cart ? 'max-width:420px;margin:32px 0 0 auto' : '') + '">' + (cart ? '<div style="display:flex;gap:8px"><input id="dc" placeholder="' + t('โค้ดส่วนลด', 'Discount code') + '" value="' + esc(DC) + '" style="flex:1"><button class="btn s" onclick="dapply()">' + t('ใช้', 'Apply') + '</button></div>' : '') + ln(t('ยอดรวมย่อย', 'Subtotal'), thb(r.sub)) + (r.d ? ln(t('ส่วนลด', 'Discount') + (DC ? ' (' + esc(DC) + ')' : ''), '– ' + thb(r.d)) : '') + (DC && r.code && r.code.t == 'ship' ? ln(t('ส่วนลด', 'Discount') + ' (' + esc(DC) + ')', t('ส่งฟรี', 'Free shipping')) : '') + ln(t('ค่าส่ง', 'Shipping'), r.ship ? thb(r.ship) : t('ฟรี', 'Free')) + ln(t('ยอดรวม', 'Total'), thb(r.total), 1) + (cart ? '<a class="btn p" style="text-align:center" href="#/checkout">' + t('ชำระเงิน', 'Checkout') + '</a>' : '') + '</div>';
 }
 function cartView() {
-  var t0 = '<div class="top"><h1>Cart</h1></div>';
-  if (!CART.length) return t0 + '<p>Your cart is empty. <a href="#/shop" style="text-decoration:underline">Browse the collection</a></p>';
-  var rows = CART.map(function (l, i) { var p = gp(l.id); if (!p) return ''; return '<tr><td><a href="#/p/' + esc(p.id) + '">' + esc(p.name) + '</a></td><td>' + esc(l.c) + ' / ' + esc(l.s) + '</td><td><div class="qty"><button onclick="cq(' + i + ',-1)">–</button><span>' + l.qty + '</span><button onclick="cq(' + i + ',1)">+</button></div></td><td>' + thb(p.price) + '</td><td>' + thb(p.price * l.qty) + '</td><td><button class="btn s d" onclick="crm(' + i + ')">Remove</button></td></tr>'; }).join('');
-  return t0 + '<div class="sc"><table class="tb"><tr><th>Product</th><th>Variant</th><th>Quantity</th><th>Price</th><th>Subtotal</th><th></th></tr>' + rows + '</table></div>' + sumbox(calc(), 1);
+  var t0 = '<div class="top"><h1>' + t('ตะกร้า', 'Cart') + '</h1></div>';
+  if (!CART.length) return t0 + '<p>' + t('ตะกร้าว่าง', 'Your cart is empty.') + ' <a href="#/shop" style="text-decoration:underline">' + t('ดูสินค้า', 'Browse the collection') + '</a></p>';
+  var rows = CART.map(function (l, i) { var p = gp(l.id); if (!p) return ''; return '<tr><td><a href="#/p/' + esc(p.id) + '">' + esc(p.name) + '</a></td><td>' + esc(l.c) + ' / ' + esc(l.s) + '</td><td><div class="qty"><button onclick="cq(' + i + ',-1)">–</button><span>' + l.qty + '</span><button onclick="cq(' + i + ',1)">+</button></div></td><td>' + thb(p.price) + '</td><td>' + thb(p.price * l.qty) + '</td><td><button class="btn s d" onclick="crm(' + i + ')">' + t('ลบ', 'Remove') + '</button></td></tr>'; }).join('');
+  return t0 + '<div class="sc"><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>' + t('แบบ', 'Variant') + '</th><th>' + t('จำนวน', 'Quantity') + '</th><th>' + t('ราคา', 'Price') + '</th><th>' + t('รวม', 'Subtotal') + '</th><th></th></tr>' + rows + '</table></div>' + sumbox(calc(), 1);
 }
 function checkoutView() {
-  if (!CART.length) return '<div class="top"><h1>Checkout</h1></div><p>Your cart is empty.</p>';
+  if (!CART.length) return '<div class="top"><h1>' + t('ชำระเงิน', 'Checkout') + '</h1></div><p>' + t('ตะกร้าว่าง', 'Your cart is empty.') + '</p>';
   function f(id, l, ph, c, t, ac) { return '<label class="' + (c || '') + '">' + l + '<input id="' + id + '" type="' + (t || 'text') + '" placeholder="' + ph + '" autocomplete="' + (ac || 'off') + '"></label>'; }
   var pays = [['promptpay', 'PromptPay', 'Scan QR จากแอปธนาคารหลังสั่งซื้อ'], ['card', 'Credit / debit card', 'จ่ายผ่าน payment provider'], ['bank', 'Bank transfer', 'โอนแล้วแนบสลิป']];
   var items = CART.map(function (l) { var p = gp(l.id); return p ? '<div class="row"><span>' + esc(p.name) + ' <span class="sm">' + esc(l.c) + ' / ' + esc(l.s) + ' × ' + l.qty + '</span></span><span>' + thb(p.price * l.qty) + '</span></div>' : ''; }).join('');
-  return '<div class="top"><h1>Checkout</h1><a class="sm" href="#/cart">Back to cart</a></div><div class="ck"><div><div class="fm" style="grid-template-columns:1fr 1fr">' + f('em', 'Email', 'name@example.com', 'w2', 'email', 'email') + f('nm', 'Full name', 'ชื่อ-นามสกุล', 'w2') + f('ph', 'Phone', '081 234 5678', 'w2', 'tel', 'tel') + f('ad', 'Address', 'บ้านเลขที่ หมู่ ซอย ถนน', 'w2', 'text', 'street-address') + f('sd', 'Subdistrict (แขวง / ตำบล)', '', '', 'text') + f('ds', 'District (เขต / อำเภอ)', '', '', 'text') +
-    '<label>Province (จังหวัด)<input id="pv" list="pvl" placeholder="เลือกหรือพิมพ์จังหวัด"></label><datalist id="pvl">' + PROV.map(function (p) { return '<option value="' + p + '">'; }).join('') + '</datalist>' + f('zp', 'Postcode', '10110', '', 'text', 'postal-code') + '</div>' +
-    '<h3 style="font-size:28px;margin:28px 0 12px">Payment</h3><div style="display:grid;gap:10px">' + pays.map(function (a, i) { return '<label class="pay"><input type="radio" name="pay" value="' + a[0] + '"' + (i ? '' : ' checked') + '><span><b>' + a[1] + '</b><br>' + a[2] + '</span></label>'; }).join('') + '</div></div>' +
-    '<div class="fm" style="grid-template-columns:1fr;position:sticky;top:80px"><h3 style="font-size:28px">Order summary</h3>' + items + sumbox(calc(), 0) + '<button class="btn p" onclick="place()">Place order</button></div></div>';
+  return '<div class="top"><h1>' + t('ชำระเงิน', 'Checkout') + '</h1><a class="sm" href="#/cart">' + t('กลับไปตะกร้า', 'Back to cart') + '</a></div><div class="ck"><div><div class="fm" style="grid-template-columns:1fr 1fr">' + f('em', 'Email', 'name@example.com', 'w2', 'email', 'email') + f('nm', t('ชื่อ-นามสกุล', 'Full name'), 'ชื่อ-นามสกุล', 'w2') + f('ph', t('โทรศัพท์', 'Phone'), '081 234 5678', 'w2', 'tel', 'tel') + f('ad', t('ที่อยู่', 'Address'), 'บ้านเลขที่ หมู่ ซอย ถนน', 'w2', 'text', 'street-address') + f('sd', t('แขวง/ตำบล', 'Subdistrict'), '', '', 'text') + f('ds', t('เขต/อำเภอ', 'District'), '', '', 'text') +
+    '<label>' + t('จังหวัด', 'Province') + '<input id="pv" list="pvl" placeholder="' + t('เลือกหรือพิมพ์จังหวัด', 'Select province') + '"></label><datalist id="pvl">' + PROV.map(function (p) { return '<option value="' + p + '">'; }).join('') + '</datalist>' + f('zp', t('รหัสไปรษณีย์', 'Postcode'), '10110', '', 'text', 'postal-code') + '</div>' +
+    '<h3 style="font-size:28px;margin:28px 0 12px">' + t('ชำระเงิน', 'Payment') + '</h3><div style="display:grid;gap:10px">' + pays.map(function (a, i) { return '<label class="pay"><input type="radio" name="pay" value="' + a[0] + '"' + (i ? '' : ' checked') + '><span><b>' + a[1] + '</b><br>' + a[2] + '</span></label>'; }).join('') + '</div></div>' +
+    '<div class="fm" style="grid-template-columns:1fr;position:sticky;top:80px"><h3 style="font-size:28px">' + t('สรุปคำสั่งซื้อ', 'Order summary') + '</h3>' + items + sumbox(calc(), 0) + '<button class="btn p" onclick="place()">' + t('สั่งซื้อ', 'Place order') + '</button></div></div>';
 }
 function place() {
   var g = function (i) { return (document.getElementById(i).value || '').trim(); }, em = g('em'), ph = g('ph').replace(/[\s-]/g, '').replace(/^\+66/, '0'), zp = g('zp'), err = null;
@@ -480,7 +495,7 @@ window.sbLogout = async function () { var c = sb(); if (c) await c.auth.signOut(
 
 /* ---------- misc views ---------- */
 function tcur() { CUR = CUR == 'THB' ? 'USD' : 'THB'; try { localStorage.setItem('jg_cur', CUR); } catch (e) {} go(); }
-function applyLogo() { cnt(); var cu = document.getElementById('cur'); if (cu) cu.textContent = CUR; }
+function applyLogo() { cnt(); var cu = document.getElementById('cur'); if (cu) cu.textContent = CUR; applyHeader(); }
 function hc() { var m = (location.hash || '').match(/^#\/shop\?cat=(.+)$/); if (m) F.cat = decodeURIComponent(m[1]); }
 
 /* ---------- account: my orders (member) ---------- */
