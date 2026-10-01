@@ -1,3 +1,4 @@
-js/config.js
 .env
 .DS_Store
+# หมายเหตุ: js/config.js มีแค่ anon key (public by design, RLS คุมสิทธิ์) commit ได้
+# ห้าม commit service_role key เด็ดขาด
