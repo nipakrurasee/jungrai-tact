@@ -34,6 +34,7 @@ var H = { slides: JSON.parse(JSON.stringify(SEED_SLIDES)), secs: 7, logo: 1, wm:
 var PG = JSON.parse(JSON.stringify(DEFAULT_PAGE));
 var CART = [], DC = '', ORDS = {}, CUR = 'THB', OO = '';
 var WL = [], RV = {}, MD = []; // wishlist ids, reviews by product, media rows
+var CUSTS = []; // customers table (staff only)
 var LANG = 'TH'; // TH | EN
 try { LANG = localStorage.getItem('jt_lang') || 'TH'; } catch (e) {}
 function t(th, en) { return LANG === 'TH' ? th : en; }
@@ -142,6 +143,8 @@ async function loadSupabase() {
     if (cf.data) cf.data.forEach(function (r) { if (r.key == 'home') { H.secs = r.value.secs || 7; H.logo = r.value.logo == 0 ? 0 : 1; H.wm = r.value.wm == 0 ? 0 : 1; } if (r.key == 'page') { PG = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PAGE)), r.value); } });
     var se = await c.auth.getSession(); SB_USER = se.data.session ? se.data.session.user : null;
     await loadRole();
+    // กันเห็นออเดอร์ข้าม user: login แล้วใช้ข้อมูล server ของตัวเองเท่านั้น
+    if (SB_USER) { ORDS = {}; CUSTS = []; await claimGuestOrders(); }
     var od;
     if (!SB_USER) od = { data: [] };
     else if (isStaff()) od = await c.from('orders').select('*').order('created_at', { ascending: false }).limit(200);
@@ -149,6 +152,13 @@ async function loadSupabase() {
     if (od.data) od.data.forEach(function (r) {
       ORDS[r.order_no] = { no: r.order_no, at: r.created_at, cust: r.customer, addr: r.address, items: r.items, sub: r.subtotal, d: r.discount, ship: r.shipping, total: r.total, code: r.discount_code, pay: r.payment_method, status: r.status, track: r.tracking, note: r.note, stockDone: r.stock_deducted, log: r.log || [] };
     });
+    try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
+    if (SB_USER && isStaff()) {
+      try {
+        var cu = await c.from('customers').select('*').order('total_spent', { ascending: false }).limit(200);
+        if (cu.data) CUSTS = cu.data;
+      } catch (e) {}
+    }
     // v14: wishlist (merge local + server), approved reviews, media
     try {
       var wq = SB_USER ? await c.from('wishlists').select('product_id').eq('user_id', SB_USER.id) : { data: [] };
@@ -178,6 +188,11 @@ async function dbSaveOrder(o) {
   await c.from('orders').insert({ order_no: o.no, customer: o.cust, address: o.addr, items: o.items, subtotal: o.sub, discount: o.d, shipping: o.ship, total: o.total, discount_code: o.code, payment_method: o.pay, status: o.status, tracking: o.track, note: o.note, stock_deducted: o.stockDone, log: o.log, user_id: (SB_USER && SB_USER.id) || null, customer_email: ((o.cust && o.cust.email) || '').toLowerCase() });
 }
 async function dbUpdateOrder(no, patch) { var c = sb(); if (!c) return; await c.from('orders').update(patch).eq('order_no', no); }
+/* เคลมออเดอร์ที่สั่งตอน guest (อีเมลเดียวกัน) มาผูกกับ user หลัง login */
+async function claimGuestOrders() {
+  var c = sb(); if (!c || !SB_USER || !SB_USER.email) return;
+  try { await c.from('orders').update({ user_id: SB_USER.id }).is('user_id', null).eq('customer_email', String(SB_USER.email).toLowerCase()); } catch (e) {}
+}
 async function dbSavePage() {
   var c = sb(); if (!c) return;
   await c.from('site_configs').upsert({ key: 'page', value: PG }, { onConflict: 'key' });
@@ -605,6 +620,7 @@ function jtDashboard() {
 }
 function jtInventory() { return jtShell(t('สต็อก', 'Inventory'), '#/admin/inventory', '<div class="jt-panel"><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>SKU</th><th>' + t('สต็อก', 'Stock') + '</th><th>' + t('สถานะ', 'Status') + '</th></tr>' + P.map(function (p) { var n2 = Number(p.stock || 0); return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.sku) + '</td><td>' + n2 + '</td><td>' + (n2 <= 0 ? t('หมด', 'OUT') : n2 <= Number(p.low || 5) ? t('น้อย', 'LOW') : t('ปกติ', 'IN')) + '</td></tr>'; }).join('') + '</table></div>'); }
 function jtCustomers() {
+  if (CUSTS.length) return jtShell(t('ลูกค้า', 'Customers'), '#/admin/customers', '<div class="jt-panel"><table class="tb"><tr><th>' + t('ชื่อ', 'Name') + '</th><th>Email</th><th>' + t('โทร', 'Phone') + '</th><th>' + t('ออเดอร์', 'Orders') + '</th><th>' + t('ยอดรวม', 'Total') + '</th></tr>' + CUSTS.map(function (c) { return '<tr><td>' + esc(c.name || '-') + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.phone || '-') + '</td><td>' + (c.orders_count || 0) + '</td><td>' + bt(c.total_spent || 0) + '</td></tr>'; }).join('') + '</table></div>');
   var map = {}; Object.keys(ORDS).forEach(function (k) { var o = ORDS[k], c = o.cust || {}; var key = String(c.email || 'guest:' + o.no).toLowerCase(); if (!map[key]) map[key] = { name: c.name || 'Guest', email: c.email || '', phone: c.phone || '', orders: 0, total: 0 }; map[key].orders++; map[key].total += Number(o.total || 0); });
   return jtShell(t('ลูกค้า', 'Customers'), '#/admin/customers', '<div class="jt-panel"><table class="tb"><tr><th>' + t('ชื่อ', 'Name') + '</th><th>Email</th><th>' + t('โทร', 'Phone') + '</th><th>' + t('ออเดอร์', 'Orders') + '</th><th>' + t('ยอดรวม', 'Total') + '</th></tr>' + Object.keys(map).map(function (k) { var c = map[k]; return '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.phone) + '</td><td>' + c.orders + '</td><td>' + bt(c.total) + '</td></tr>'; }).join('') + '</table></div>');
 }
@@ -698,7 +714,7 @@ function handleAuthRedirect() {
   else if (desc) T(desc);
   try { history.replaceState(null, '', location.pathname + '#/admin/system/supabase'); } catch (e) { location.hash = '#/admin/system/supabase'; }
 }
-window.sbLogout = async function () { var c = sb(); if (c) await c.auth.signOut(); SB_USER = null; SB_ROLE = 'guest'; SB_PROFILES = []; T(t('ออกจากระบบแล้ว', 'Logged out')); go(); };
+window.sbLogout = async function () { var c = sb(); if (c) await c.auth.signOut(); SB_USER = null; SB_ROLE = 'guest'; SB_PROFILES = []; ORDS = {}; CUSTS = []; try { localStorage.removeItem('jg_orders'); } catch (e) {} T(t('ออกจากระบบแล้ว', 'Logged out')); go(); };
 
 /* ---------- misc views ---------- */
 function tcur() { CUR = CUR == 'THB' ? 'USD' : 'THB'; try { localStorage.setItem('jg_cur', CUR); } catch (e) {} go(); }
@@ -792,7 +808,9 @@ loadLocal(); handleAuthRedirect(); hc(); go();
   var c = sb();
   if (c) c.auth.onAuthStateChange(function (ev, session) {
     SB_USER = session ? session.user : null;
-    loadRole().then(function () {
+    loadRole().then(async function () {
+      if (SB_USER) { try { await loadSupabase(); } catch (e) {} }
+      else { ORDS = {}; CUSTS = []; SB_ROLE = 'guest'; }
       if (isStaff() && sb()) sbLoadProfilesSilent();
       go();
     });

@@ -29,6 +29,7 @@ vercel.json / netlify.toml  # รองรับ SPA routing
 3. New query อีกอัน → ก็อป `supabase/seed.sql` → **Run**
 4. New query อีกอัน → ก็อป `supabase/migration_roles.sql` → **Run** (ระบบสิทธิ์ owner/shop_admin/member/guest)
 5. New query อีกอัน → ก็อป `supabase/migration_v14.sql` → **Run** (wishlist + reviews + media library)
+6. New query อีกอัน → ก็อป `supabase/migration_customer_fix.sql` → **Run** (customers auto-sync + เคลมออเดอร์ guest)
 5. เมนู **Storage** → ตรวจว่ามี bucket `product-images` + `slide-images` (สร้างจาก SQL แล้ว, เป็น public)
 6. เมนู **Project Settings → API** → ก็อป `Project URL` + `anon public key`
 7. เมนู **Authentication → Users → Add user** → เพิ่มอีเมล owner + shop_admin + ทดสอบ member
