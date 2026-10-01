@@ -486,14 +486,26 @@ function jtSupabase() {
   var ls = {}; try { ls = JSON.parse(localStorage.getItem('jt_supabase') || '{}'); } catch (e) {}
   // ยังไม่ต่อ: หน้า setup (เห็นเฉพาะตอน local mode)
   if (!sb()) return jtShell('Supabase', '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Supabase URL<input id="sb_url" value="' + esc(ls.url || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_URL) || '')) + '" placeholder="https://xyz.supabase.co"></label><label class="full">Anon key (public — ปลอดภัยที่จะอยู่ในเว็บ)<input id="sb_key" value="' + esc(ls.key || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || '')) + '" placeholder="eyJ..."></label></div><div style="margin-top:12px"><button class="btn p" onclick="sbSave()">Save & connect</button></div><p class="jgt-muted" style="margin-top:12px">รัน supabase/schema.sql + seed.sql + migration_roles.sql ก่อน แล้วค่อย Save & connect</p></div>');
-  // ต่อแล้วแต่ยังไม่ login: เห็นแค่ฟอร์ม login ไม่เห็น key
-  if (!SB_USER) return jtShell('Login', '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Email แอดมิน/สมาชิก<input id="sb_email" type="email" placeholder="owner@jungrai.com"></label></div><div style="margin-top:12px"><button class="btn p" onclick="sbLogin()">Send magic link</button></div><p class="jgt-muted" style="margin-top:12px">ระบบจะส่งลิงก์ login ไปที่อีเมล กดลิงก์ในอีเมลเพื่อเข้าใช้งาน · ครั้งแรกต้องให้ owner เพิ่ม user ใน Supabase Dashboard → Authentication ก่อน</p></div>');
+  // ต่อแล้วแต่ยังไม่ login: ฟอร์ม email+password เข้าเลย (magic link เป็นทางเลือก)
+  if (!SB_USER) return jtShell('Login', '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Email<input id="sb_email" type="email" placeholder="owner@jungrai.com" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label><label class="full">Password<input id="sb_pass" type="password" placeholder="รหัสผ่าน" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbLoginPass()">Login</button><button class="btn" onclick="sbLogin()">Send magic link แทน</button></div><p class="jgt-muted" style="margin-top:12px">กรอก email + password ที่ owner สร้างให้ใน Supabase Dashboard → Authentication แล้วเข้าได้เลย ไม่ต้องวนผ่านอีเมล · ลืมรหัสให้ owner กด Reset password ใน Dashboard</p></div>');
   // login แล้ว: สถานะ + logout, ช่อง URL/key เห็น/แก้ได้เฉพาะ owner
   var conn = isOwner() ? '<div class="jt-form" style="margin-top:12px"><label class="full">Supabase URL<input id="sb_url" value="' + esc(SB.url) + '"></label><label class="full">Anon key<input id="sb_key" value="' + esc((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || ls.key || '') + '"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbSave()">Save & connect</button><button class="btn d" onclick="SBClear()">Disconnect</button></div>' : '';
   return jtShell('Account', '#/admin/system/supabase', '<div class="jt-panel"><p>Login: <b>' + esc(SB_USER.email) + '</b> · <span class="bd">' + esc(roleLabel()) + '</span></p><div style="margin-top:12px"><button class="btn" onclick="sbLogout()">Logout</button></div>' + conn + '</div>');
 }
 window.sbSave = function () { var u = document.getElementById('sb_url').value.trim(), k = document.getElementById('sb_key').value.trim(); if (!u || !k) { T('กรอก URL + key'); return; } SB.saveConn(u, k); };
 window.SBClear = function () { SB.clearConn(); };
+window.sbLoginPass = async function () {
+  var c = sb(); if (!c) { T('ต่อ Supabase ก่อน'); return; }
+  var em = ((document.getElementById('sb_email') || {}).value || '').trim();
+  var pw = ((document.getElementById('sb_pass') || {}).value || '');
+  if (!em || !pw) { T('กรอก email + password'); return; }
+  var r = await c.auth.signInWithPassword({ email: em, password: pw });
+  if (r.error) { T(r.error.message === 'Invalid login credentials' ? 'อีเมลหรือรหัสผ่านไม่ถูก — เช็กว่ามี user นี้ใน Authentication แล้ว' : r.error.message); return; }
+  SB_USER = r.data.user; await loadRole();
+  if (isStaff()) await sbLoadProfilesSilent();
+  T('ยินดีต้อนรับ ' + em);
+  location.hash = isStaff() ? '#/admin/dashboard' : '#/account/orders'; go();
+};
 window.sbLogin = async function () {
   var c = sb(); if (!c) { T('ต่อ Supabase ก่อน'); return; }
   var em = (document.getElementById('sb_email') || {}).value || prompt('Admin email:'); if (!em) return;
