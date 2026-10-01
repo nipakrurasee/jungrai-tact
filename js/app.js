@@ -436,7 +436,8 @@ function jtNav(active) {
   if (isStaff()) sys.push(['Staff & Roles', '#/admin/system/staff']);
   if (isOwner()) sys.push(['Activity Log', '#/admin/system/activity']);
   groups.push(['SYSTEM', sys]);
-  var h = '<aside class="jt-side"><div class="jt-brand"><a href="#/" style="font-weight:800">JUNGRAI TACT</a><div class="jgt-muted">' + (sb() ? '● Supabase · ' + esc(roleLabel()) : '○ local · owner') + '</div></div>';
+  var sts = isStaff() ? '<div class="jgt-muted">' + (sb() ? '● Supabase · ' + esc(roleLabel()) : '○ local · owner') + '</div>' : '';
+  var h = '<aside class="jt-side"><div class="jt-brand"><a href="#/" style="font-weight:800">JUNGRAI TACT</a>' + sts + '</div>';
   groups.forEach(function (g) { h += '<div class="jt-group">' + g[0] + '</div>'; g[1].forEach(function (x) { h += '<a href="' + x[1] + '" class="' + (active === x[1] ? 'active' : '') + '">' + x[0] + '</a>'; }); });
   return h + '</aside>';
 }
