@@ -527,7 +527,6 @@ window.sbChangePass = async function () {
   var r = await c.auth.updateUser({ password: pw });
   if (r.error) T(r.error.message); else T(t('เปลี่ยนรหัสผ่านแล้ว', 'Password changed'));
 };
-}
 window.sbSave = function () { var u = document.getElementById('sb_url').value.trim(), k = document.getElementById('sb_key').value.trim(); if (!u || !k) { T('กรอก URL + key'); return; } SB.saveConn(u, k); };
 window.SBClear = function () { SB.clearConn(); };
 window.sbLoginPass = async function () {
