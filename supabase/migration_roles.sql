@@ -57,6 +57,8 @@ create or replace function public.check_product_edit()
 returns trigger language plpgsql as $$
 declare r text;
 begin
+  -- SQL Editor / ต่อ DB ตรง (ไม่มี JWT): ปล่อยผ่าน ถือว่ามี DB password แล้ว
+  if current_setting('request.jwt.claims', true) is null then return new; end if;
   r := public.my_role();
   if r = 'owner' then return new; end if;
   if r = 'shop_admin' then
@@ -84,6 +86,10 @@ for each row execute function public.check_product_edit();
 create or replace function public.check_profile_role()
 returns trigger language plpgsql as $$
 begin
+  -- SQL Editor / ต่อ DB ตรง (ไม่มี JWT): ปล่อยผ่าน ถือว่ามี DB password แล้ว
+  if current_setting('request.jwt.claims', true) is null then return new; end if;
+  -- bootstrap: ถ้ายังไม่มี owner เลย อนุญาตให้ตั้งคนแรกได้
+  if not exists (select 1 from public.profiles where role = 'owner') then return new; end if;
   if new.role is distinct from old.role and public.my_role() <> 'owner' then
     raise exception 'เปลี่ยน role ได้เฉพาะ owner';
   end if;
