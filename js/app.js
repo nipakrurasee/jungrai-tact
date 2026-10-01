@@ -432,7 +432,10 @@ function jtNav(active) {
     groups.push(['WEBSITE', [['Homepage', '#/admin/website/homepage'], ['Sections', '#/admin/website/sections']]]);
     groups.push(['SETTINGS', [['General', '#/admin/settings/general'], ['Shipping', '#/admin/settings/shipping'], ['Payment', '#/admin/settings/payment'], ['Contact', '#/admin/settings/contact'], ['SEO', '#/admin/settings/seo'], ['Maintenance', '#/admin/settings/maintenance']]]);
   }
-  groups.push(['SYSTEM', [['Supabase', '#/admin/system/supabase'], ['Staff & Roles', '#/admin/system/staff'], ['Activity Log', '#/admin/system/activity']]]);
+  var sys = [['Supabase', '#/admin/system/supabase']];
+  if (isStaff()) sys.push(['Staff & Roles', '#/admin/system/staff']);
+  if (isOwner()) sys.push(['Activity Log', '#/admin/system/activity']);
+  groups.push(['SYSTEM', sys]);
   var h = '<aside class="jt-side"><div class="jt-brand"><a href="#/" style="font-weight:800">JUNGRAI TACT</a><div class="jgt-muted">' + (sb() ? '● Supabase · ' + esc(roleLabel()) : '○ local · owner') + '</div></div>';
   groups.forEach(function (g) { h += '<div class="jt-group">' + g[0] + '</div>'; g[1].forEach(function (x) { h += '<a href="' + x[1] + '" class="' + (active === x[1] ? 'active' : '') + '">' + x[0] + '</a>'; }); });
   return h + '</aside>';
@@ -523,8 +526,8 @@ function go() {
   else if (h === '#/admin/website/sections') v = isOwner() ? jtShell('Sections', '#/admin/website/sections', adminSec()) : deny('Owner only');
   else if (/^#\/admin\/settings\//.test(h)) v = isOwner() ? jtSettings(h.split('/')[3]) : deny('Owner only');
   else if (h === '#/admin/system/supabase') v = jtSupabase();
-  else if (h === '#/admin/system/staff') v = jtStaff();
-  else if (h === '#/admin/system/activity') v = jtActivity();
+  else if (h === '#/admin/system/staff') v = isStaff() ? jtStaff() : deny('Staff only');
+  else if (h === '#/admin/system/activity') v = isOwner() ? jtActivity() : deny('Owner only');
   else if (h === '#/product') v = jtShell('Product', '#/product', '<div class="jt-panel"><p>เลือกสินค้าจาก Shop</p><a class="btn p" href="#/shop">Go to Shop</a></div>');
   else if (h === '#/order-complete' || m2) { var no = m2 ? decodeURIComponent(m2[1]) : null; v = no ? doneView(no) : jtShell('Order Complete', '#/order-complete', '<div class="jt-panel"><p>Done</p></div>'); }
   else if (m) v = prod(decodeURIComponent(m[1]));
