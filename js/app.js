@@ -389,11 +389,27 @@ function dropInit() {
 }
 
 /* ---------- admin: products ---------- */
+var PO = '';
 function fld(k, l, t, c) { var v = E[k]; if (Array.isArray(v)) v = v.join(', '); return '<label class="' + (c || '') + '">' + l + (t == 'ta' ? '<textarea data-k="' + k + '">' + esc(v) + '</textarea>' : '<input data-k="' + k + '" type="' + (t || 'text') + '" value="' + esc(v) + '">') + '</label>'; }
 function admin() {
   var h = '<div class="top"><h1>' + t('สินค้า', 'Products') + '</h1>' + (isOwner() ? '<button class="btn p" onclick="edit(-1)">' + t('เพิ่มสินค้า', 'New product') + '</button>' : '<span class="sm">' + esc(roleLabel()) + (myRole() === 'shop_admin' ? t(' · แก้ได้เฉพาะสต็อก', ' · stock only') : '') + '</span>') + '</div>' + (sb() ? (SB_USER ? '<p class="sm">Supabase · ' + esc(SB_USER.email) + ' · ' + esc(roleLabel()) + ' · <a href="#" onclick="sbLogout();return false" style="text-decoration:underline">logout</a></p>' : '<p class="sm">Supabase connected · <a href="#/admin/system/supabase" style="text-decoration:underline">' + t('login เพื่อเขียนข้อมูล', 'login to edit') + '</a></p>') : '<div class="note">' + t('Local mode — ต่อ Supabase ที่เมนู SYSTEM › Supabase', 'Local mode — connect Supabase under SYSTEM › Supabase') + '</div>');
   if (E) h += form();
-  h += '<div class="sc"><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>SKU</th><th>' + t('ราคา', 'Price') + '</th><th>' + t('สต็อก', 'Stock') + '</th><th>' + t('สถานะ', 'Status') + '</th><th></th></tr>' + P.map(function (p, i) { return '<tr><td>' + esc(p.name) + (p.featured ? ' <span class="sm">★</span>' : '') + '</td><td>' + esc(p.sku) + '</td><td>' + thb(p.price) + '</td><td' + (p.stock <= p.low ? ' style="color:var(--sd)"' : '') + '>' + p.stock + '</td><td><span class="bd ' + p.status + '">' + p.status + '</span></td><td><button class="btn s" onclick="edit(' + i + ')">' + (myRole() === 'shop_admin' ? t('สต็อก', 'Stock') : t('แก้', 'Edit')) + '</button>' + (isStaff() ? ' <button class="btn s" onclick="arch(' + i + ')">' + (p.status == 'archived' ? t('กู้คืน', 'Restore') : t('เก็บ', 'Archive')) + '</button>' : '') + (isOwner() ? ' <button class="btn s d" onclick="del(' + i + ')">' + t('ลบ', 'Delete') + '</button>' : '') + '</td></tr>'; }).join('') + '</table></div>'; return h;
+  h += '<div class="sc"><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>SKU</th><th>' + t('ราคา', 'Price') + '</th><th>' + t('สต็อก', 'Stock') + '</th><th>' + t('สถานะ', 'Status') + '</th><th></th></tr>';
+  P.forEach(function (p, i) {
+    var open = PO === p.id;
+    h += '<tr style="cursor:pointer" onclick="PO=PO===\'' + p.id + '\'?\'\':\'' + p.id + '\';go()"><td>' + esc(p.name) + (p.featured ? ' <span class="sm">★</span>' : '') + '</td><td>' + esc(p.sku) + '</td><td>' + thb(p.price) + '</td><td' + (p.stock <= p.low ? ' style="color:var(--sd)"' : '') + '>' + p.stock + '</td><td><span class="bd ' + p.status + '">' + p.status + '</span></td><td style="text-align:right;white-space:nowrap"><button class="btn s" onclick="event.stopPropagation();edit(' + i + ')">' + (myRole() === 'shop_admin' ? t('สต็อก', 'Stock') : t('แก้', 'Edit')) + '</button>' + (isStaff() ? ' <button class="btn s" onclick="event.stopPropagation();arch(' + i + ')">' + (p.status == 'archived' ? t('กู้คืน', 'Restore') : t('เก็บ', 'Archive')) + '</button>' : '') + (isOwner() ? ' <button class="btn s d" onclick="event.stopPropagation();del(' + i + ')">' + t('ลบ', 'Delete') + '</button>' : '') + '</td></tr>';
+    if (open) {
+      var imgs = (IM[p.id] || []).map(function (u) { return '<a href="' + u + '" target="_blank" style="width:72px;height:90px;display:inline-block;border:1px solid var(--ln);overflow:hidden"><img src="' + u + '" alt="" style="width:100%;height:100%;object-fit:cover"></a>'; }).join('');
+      var kv = function (k, v) { return (v === '' || v == null || (Array.isArray(v) && !v.length)) ? '' : '<div><b>' + k + '</b><br>' + esc(Array.isArray(v) ? v.join(', ') : v) + '</div>'; };
+      h += '<tr><td colspan="6" style="text-align:left"><div class="fm" style="margin:0;border:0;padding:8px 0;grid-template-columns:repeat(4,1fr)">' + (imgs ? '<div class="w4" style="display:flex;gap:8px;flex-wrap:wrap">' + imgs + '</div>' : '') +
+        '<div class="w4" style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn s" href="#/p/' + esc(p.id) + '">' + t('ดูหน้าร้าน', 'View storefront') + '</a></div>' +
+        kv('ID', p.id) + kv('Barcode', p.barcode) + kv(t('หมวด', 'Category'), p.cat) + kv(t('คอลเลกชัน', 'Collection'), p.coll) +
+        kv(t('ราคา', 'Price'), bt(p.price)) + kv(t('เทียบราคา', 'Compare-at'), p.compare ? bt(p.compare) : '') + kv(t('ต้นทุน', 'Cost'), p.cost ? bt(p.cost) : '') + kv(t('กำไร/ชิ้น', 'Margin'), (p.price - (p.cost || 0)) ? bt(p.price - (p.cost || 0)) : '') +
+        kv(t('สต็อก', 'Stock'), p.stock + ' (' + t('เตือนที่ ', 'low at ') + p.low + ')') + kv(t('สี', 'Colors'), p.colors) + kv(t('ไซส์', 'Sizes'), p.sizes) + kv('Tags', p.tags) +
+        '<div class="w4">' + kv(t('อธิบาย', 'Description'), p.desc) + kv('Spec', p.spec) + kv(t('วัสดุ', 'Material'), p.material) + kv(t('ขนาด', 'Dimensions'), p.dims) + kv(t('โน้ต', 'Notes'), p.notes) + '</div></div></td></tr>';
+    }
+  });
+  return h + '</table></div>';
 }
 function form() {
   var ro = myRole() === 'shop_admin' ? '<div class="note w4">Shop admin: แก้ได้เฉพาะ Stock / Low threshold / Status — ช่องอื่นจะถูกคงค่าเดิมตอนบันทึก</div>' : '';
