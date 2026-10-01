@@ -94,7 +94,7 @@ function art(p, c) {
 }
 function pic(p, i, c) {
   var m = IM[p.id], u = m && m[i];
-  if (u && (/^https?:\/\//.test(u) || /^data:image\//.test(u))) return '<img src="' + u + '" alt="' + esc(p.name) + '" loading="lazy">';
+  if (u && (/^(https?:|data:image|\.\/|img\/|\/)/.test(u) || /\.(jpg|jpeg|png|webp|svg|gif)(\?.*)?$/i.test(u))) return '<img src="' + u + '" alt="' + esc(p.name) + '" loading="lazy">';
   return art(p, c);
 }
 function gal(p) { var n = (IM[p.id] || []).length || 3, h = ''; for (var i = 0; i < n; i++) h += '<div class="pn">' + pic(p, i, SEL.c) + '</div>'; return '<div class="gl">' + h + '</div>'; }
@@ -113,11 +113,17 @@ function loadLocal() {
   try { ORDS = JSON.parse(localStorage.getItem('jg_orders')) || {}; } catch (e) { ORDS = {}; }
   try { CUR = localStorage.getItem('jg_cur') || 'THB'; } catch (e) {}
   if (H.logo == null) H.logo = 1; if (H.wm == null) H.wm = 1;
-  fixPG();
+  fixPG(); imgFallback();
 }
 function fixPG() {
   if (!PG.codes) PG.codes = [{ c: 'FIELD10', t: 'pct', v: 10 }, { c: 'WELCOME100', t: 'fixed', v: 100 }, { c: 'FREESHIP', t: 'ship', v: 0 }];
   if (!PG.ship) PG.ship = { rate: 60, free: 2000 };
+}
+/* รูปประจำสินค้า (ไฟล์ใน repo) สำหรับตัวที่ยังไม่มีรูปอัปโหลด */
+function imgFallback() {
+  (P || []).forEach(function (p) {
+    if (!IM[p.id] || !IM[p.id].length) IM[p.id] = ['img/products/' + p.id + '.svg'];
+  });
 }
 function saveLocal() {
   try { localStorage.setItem('jg_cat', JSON.stringify(P)); } catch (e) {}
@@ -134,6 +140,7 @@ async function loadSupabase() {
         return { id: r.id, name: r.name, sku: r.sku, barcode: r.barcode || '', cat: r.category, coll: r.collection, price: r.price, compare: r.compare_at, cost: r.cost, stock: r.stock, low: r.low_threshold, status: r.status, featured: r.featured, colors: r.colors || ['Black'], sizes: r.sizes || ['One size'], tags: r.tags || '', desc: r.description || '', spec: r.spec || '', material: r.material || '', dims: r.dims || '', notes: r.notes || '' };
       });
       IM = {}; pr.data.forEach(function (r) { if (r.image_urls && r.image_urls.length) IM[r.id] = r.image_urls; });
+      imgFallback();
     }
     var sl = await c.from('slides').select('*').order('position');
     if (sl.data && sl.data.length) {
@@ -358,7 +365,7 @@ function doneView(no) {
 
 /* ---------- home ---------- */
 function safe(u) { return /^(#\/|https:\/\/)/.test(u || '') ? u : '#/shop'; }
-function simg(u) { return /^https?:\/\//.test(u || '') || /^data:image\//.test(u || '') ? u : ''; }
+function simg(u) { return /^(https?:|data:image|\.\/|img\/|\/)/.test(u || '') || /\.(jpg|jpeg|png|webp|svg|gif)(\?.*)?$/i.test(u || '') ? u : ''; }
 function card(p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p.id) + '" class="pn">' + pic(p, 0) + '</a><div class="in"><h3>' + esc(p.name) + '</h3><div class="row"><span>' + thb(p.price) + '</span><span class="av ' + a[0] + '"><b></b>' + a[1] + '</span></div></div></div>'; }
 function homeView() {
   var sl = H.slides, sh = PG.show, CC = ['#2f3123', '#3a352a', '#2a2b2a', '#4a4d33'], SC = ['#2d2f22', '#232420', '#2d2a21', '#1b1c19', '#35382a'];
@@ -756,11 +763,17 @@ window.sbSignup = async function (btn) {
 };
 
 /* ---------- account: my orders (member) ---------- */
+var MO = ''; // opened order no
 function myOrdersView() {
   if (!SB_USER) return jtShell(t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders', '<div class="jt-panel"><p>' + t('Login ก่อนเพื่อดูออเดอร์ของตัวเอง', 'Log in to see your orders') + '</p><a class="btn p" href="#/admin/system/supabase">Login</a></div>');
   var L = Object.keys(ORDS).map(function (k) { return ORDS[k]; }).sort(function (a, b) { return a.at < b.at ? 1 : -1; });
   if (!L.length) return jtShell(t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders', '<div class="jt-panel"><p>' + t('ยังไม่มีออเดอร์', 'No orders yet') + '</p><a class="btn p" href="#/shop">' + t('ช้อปเลย', 'Shop now') + '</a></div>');
-  return jtShell(t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders', '<div class="jt-panel"><table class="tb"><tr><th>' + t('ออเดอร์', 'Order') + '</th><th>' + t('วันที่', 'Date') + '</th><th>' + t('ยอด', 'Total') + '</th><th>' + t('สถานะ', 'Status') + '</th></tr>' + L.map(function (o) { return '<tr><td>' + esc(o.no) + '</td><td>' + new Date(o.at).toLocaleDateString('en-GB') + '</td><td>' + bt(o.total) + '</td><td>' + esc(o.status) + '</td></tr>'; }).join('') + '</table></div>');
+  var h = jtShell(t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders', '<div class="jt-panel"><table class="tb"><tr><th>' + t('ออเดอร์', 'Order') + '</th><th>' + t('วันที่', 'Date') + '</th><th>' + t('ยอด', 'Total') + '</th><th>' + t('สถานะ', 'Status') + '</th></tr>');
+  L.forEach(function (o) {
+    h += '<tr style="cursor:pointer" onclick="MO=MO===\'' + o.no + '\'?\'\':\'' + o.no + '\';go()"><td>' + esc(o.no) + '</td><td>' + new Date(o.at).toLocaleDateString('en-GB') + '</td><td>' + bt(o.total) + '</td><td><span class="bd">' + esc(o.status) + '</span></td></tr>';
+    if (MO === o.no) h += '<tr><td colspan="4" style="text-align:left"><div class="fm" style="margin:0;border:0;padding:8px 0"><div class="w4"><b>' + t('สินค้า', 'Items') + '</b><br>' + o.items.map(function (l) { return esc(l.name) + ' — ' + esc(l.c) + ' / ' + esc(l.s) + ' × ' + l.qty + ' — ' + bt(l.price * l.qty); }).join('<br>') + '<br><br>' + t('ยอดรวมย่อย', 'Subtotal') + ' ' + bt(o.sub) + (o.d ? ' · ' + t('ส่วนลด', 'Discount') + ' –' + bt(o.d) : '') + ' · ' + t('ค่าส่ง', 'Shipping') + ' ' + bt(o.ship) + ' · <b>' + t('ยอดรวม', 'Total') + ' ' + bt(o.total) + '</b></div><div class="w2"><b>' + t('ส่งไปที่', 'Ship to') + '</b><br>' + esc(o.addr.line) + '<br>' + esc(o.addr.sub) + ', ' + esc(o.addr.dist) + '<br>' + esc(o.addr.prov) + ' ' + esc(o.addr.zip) + '</div><div class="w2"><b>' + t('ชำระเงิน', 'Payment') + '</b><br>' + esc(o.pay) + (o.track ? '<br><b>Tracking</b><br>' + esc(o.track) : '') + '</div><div class="w4"><b>' + t('ติดตามสถานะ', 'Timeline') + '</b><br>' + (o.log || []).map(function (e) { return new Date(e.t).toLocaleString('en-GB') + ' — ' + esc(e.s); }).join('<br>') + '</div></div></td></tr>';
+  });
+  return h + '</table></div>';
 }
 function deny(page) { var needOwner = page === 'Owner only'; return jtShell(needOwner ? t('เฉพาะ owner', 'Owner only') : t('เฉพาะทีมงาน', 'Staff only'), location.hash, '<div class="jt-panel"><p>' + t('สิทธิ์ไม่ถึง', 'No permission') + ' (' + esc(roleLabel()) + ')</p><a class="btn p" href="#/admin/system/supabase">Login / ' + t('เปลี่ยน user', 'switch user') + '</a></div>'); }
 
