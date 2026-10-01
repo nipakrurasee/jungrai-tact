@@ -430,6 +430,7 @@ async function oset(no, k, v) { if (!isStaff()) { T('ต้อง login เป�
 function jtNav(active) {
   var store = [[t('หน้าแรก', 'Home'), '#/'], [t('ร้านค้า', 'Shop'), '#/shop'], [t('สินค้า', 'Product'), '#/product'], [t('ตะกร้า', 'Cart'), '#/cart'], [t('ชำระเงิน', 'Checkout'), '#/checkout'], [t('สำเร็จ', 'Order Complete'), '#/order-complete']];
   if (SB_USER) store.push([t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders']);
+  else store.push([t('สมัครสมาชิก', 'Sign up'), '#/signup']);
   var groups = [[t('ร้าน', 'STORE'), store]];
   if (isStaff()) groups.push([t('จัดการร้าน', 'ADMIN'), [[t('แดชบอร์ด', 'Dashboard'), '#/admin/dashboard'], [t('สินค้า', 'Products'), '#/admin/products'], [t('สต็อก', 'Inventory'), '#/admin/inventory'], [t('คำสั่งซื้อ', 'Orders'), '#/admin/orders'], [t('ลูกค้า', 'Customers'), '#/admin/customers']]]);
   if (isOwner()) {
@@ -474,8 +475,31 @@ function jtCustomers() {
 }
 function jtStaff() {
   var rows = SB_PROFILES.map(function (u) { return '<tr><td>' + esc(u.email) + '</td><td><span class="bd">' + esc(u.role) + '</span></td><td style="text-align:right">' + (isOwner() && SB_USER && u.id !== SB_USER.id ? '<select onchange="sbSetRole(\'' + u.id + '\',this.value)">' + ['member', 'shop_admin', 'owner'].map(function (r) { return '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select>' : '<span class="sm">you</span>') + '</td></tr>'; }).join('');
-  return jtShell(t('ทีมงาน', 'Staff & Roles'), '#/admin/system/staff', '<div class="jt-panel"><p class="sm">' + t('Owner ทำได้ทุกอย่าง · Shop admin เติมสต็อก+จัดการออเดอร์ · Member ดูออเดอร์ตัวเอง · Guest สั่งซื้อได้อย่างเดียว', 'Owner: everything · Shop admin: stock + orders · Member: own orders · Guest: order only') + '</p><div style="margin:12px 0"><button class="btn s" onclick="sbLoadProfiles()">' + t('โหลดรายชื่อ', 'Reload users') + '</button></div><table class="tb"><tr><th>Email</th><th>' + t('บทบาท', 'Role') + '</th><th></th></tr>' + (rows || '<tr><td colspan="3">' + t('ยังไม่มีข้อมูล — กด Reload', 'No data — press Reload') + '</td></tr>') + '</table><p class="jgt-muted">' + t('เปลี่ยน role ได้เฉพาะ owner · ตั้ง owner คนแรกด้วย SQL: update profiles set role=\'owner\' where email=\'...\'', 'Only owner can change roles · set first owner via SQL') + '</p></div>');
+  return jtShell(t('ทีมงาน', 'Staff & Roles'), '#/admin/system/staff', '<div class="jt-panel"><p class="sm">' + t('Owner ทำได้ทุกอย่าง · Shop admin เติมสต็อก+จัดการออเดอร์ · Member ดูออเดอร์ตัวเอง · Guest สั่งซื้อได้อย่างเดียว', 'Owner: everything · Shop admin: stock + orders · Member: own orders · Guest: order only') + '</p>' + (isOwner() ? '<div class="jt-form" style="margin-top:12px"><label class="full">Email<input id="nu_email" type="email" placeholder="staff@jungrai.com"></label><label>' + t('รหัสชั่วคราว (≥6 ตัว)', 'Temp password (min 6)') + '<input id="nu_pass" type="text"></label><label>' + t('บทบาท', 'Role') + '<select id="nu_role"><option value="member">member</option><option value="shop_admin">shop_admin</option><option value="owner">owner</option></select></label></div><div style="margin-top:8px"><button class="btn p" onclick="sbCreateMember()">' + t('เพิ่มสมาชิก', 'Add member') + '</button></div>' : '') + '<div style="margin:12px 0"><button class="btn s" onclick="sbLoadProfiles()">' + t('โหลดรายชื่อ', 'Reload users') + '</button></div><table class="tb"><tr><th>Email</th><th>' + t('บทบาท', 'Role') + '</th><th></th></tr>' + (rows || '<tr><td colspan="3">' + t('ยังไม่มีข้อมูล — กด Reload', 'No data — press Reload') + '</td></tr>') + '</table><p class="jgt-muted">' + t('เปลี่ยน role ได้เฉพาะ owner · ตั้ง owner คนแรกด้วย SQL: update profiles set role=\'owner\' where email=\'...\'', 'Only owner can change roles · set first owner via SQL') + '</p></div>');
 }
+window.sbCreateMember = async function () {
+  if (!isOwner()) { T(t('เพิ่มสมาชิกได้เฉพาะ owner', 'Only owner can add members')); return; }
+  var c = sb();
+  var em = ((document.getElementById('nu_email') || {}).value || '').trim();
+  var pw = ((document.getElementById('nu_pass') || {}).value || '');
+  var role = ((document.getElementById('nu_role') || {}).value || 'member');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { T(t('กรอกอีเมลให้ถูกต้อง', 'Enter a valid email')); return; }
+  if (pw.length < 6) { T(t('รหัสผ่านอย่างน้อย 6 ตัว', 'Password min 6 chars')); return; }
+  var myId = SB_USER.id;
+  var r = await c.auth.signUp({ email: em, password: pw });
+  if (r.error) { T(r.error.message); return; }
+  if (r.data.session && r.data.session.user.id !== myId) {
+    // instance ไม่ต้องยืนยันอีเมล: session ถูกสลับเป็น user ใหม่ → ออกแล้วให้ owner login กลับ
+    await c.auth.signOut(); SB_USER = null; SB_ROLE = 'guest'; SB_PROFILES = [];
+    T(t('สร้าง ', 'Created ') + em + t(' แล้ว (เริ่มเป็น member — ปรับ role ได้ที่ตารางหลังเขา login ครั้งแรก) กรุณา login กลับเป็น owner', ' as member — adjust role here after their first login. Please log back in as owner'));
+    location.hash = '#/admin/system/supabase'; go(); return;
+  }
+  // ต้องยืนยันอีเมลก่อน: session ยังเป็น owner → ตั้ง role ให้ได้เลย
+  var pr = await c.from('profiles').select('id').eq('email', em.toLowerCase()).single();
+  if (pr.data && role !== 'member') await c.from('profiles').update({ role: role }).eq('id', pr.data.id);
+  T(t('เพิ่ม ', 'Added ') + em + ' (' + role + ')' + t(' — ส่งรหัสชั่วคราวให้เขา login แล้วเปลี่ยนรหัสเองที่หน้า Account', ' — send them the temp password; they can change it under Account'));
+  sbLoadProfiles();
+};
 window.sbSetRole = async function (id, role) {
   if (!isOwner()) { T('เปลี่ยน role ได้เฉพาะ owner'); return; }
   var c = sb(); var r = await c.from('profiles').update({ role: role }).eq('id', id);
@@ -492,10 +516,17 @@ function jtSupabase() {
   // ยังไม่ต่อ: หน้า setup (เห็นเฉพาะตอน local mode)
   if (!sb()) return jtShell('Supabase', '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Supabase URL<input id="sb_url" value="' + esc(ls.url || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_URL) || '')) + '" placeholder="https://xyz.supabase.co"></label><label class="full">Anon key (public — ปลอดภัยที่จะอยู่ในเว็บ)<input id="sb_key" value="' + esc(ls.key || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || '')) + '" placeholder="eyJ..."></label></div><div style="margin-top:12px"><button class="btn p" onclick="sbSave()">Save & connect</button></div><p class="jgt-muted" style="margin-top:12px">รัน supabase/schema.sql + seed.sql + migration_roles.sql ก่อน แล้วค่อย Save & connect</p></div>');
   // ต่อแล้วแต่ยังไม่ login: ฟอร์ม email+password เข้าเลย (magic link เป็นทางเลือก)
-  if (!SB_USER) return jtShell(t('เข้าสู่ระบบ', 'Login'), '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Email<input id="sb_email" type="email" placeholder="owner@jungrai.com" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label><label class="full">' + t('รหัสผ่าน', 'Password') + '<input id="sb_pass" type="password" placeholder="' + t('รหัสผ่าน', 'Password') + '" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbLoginPass()">Login</button><button class="btn" onclick="sbLogin()">' + t('ส่ง magic link แทน', 'Send magic link instead') + '</button></div><p class="jgt-muted" style="margin-top:12px">' + t('กรอก email + password ที่ owner สร้างให้ แล้วเข้าได้เลย', 'Enter the email + password from your owner to log in directly') + '</p></div>');
+  if (!SB_USER) return jtShell(t('เข้าสู่ระบบ', 'Login'), '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Email<input id="sb_email" type="email" placeholder="owner@jungrai.com" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label><label class="full">' + t('รหัสผ่าน', 'Password') + '<input id="sb_pass" type="password" placeholder="' + t('รหัสผ่าน', 'Password') + '" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbLoginPass()">Login</button><button class="btn" onclick="sbLogin()">' + t('ส่ง magic link แทน', 'Send magic link instead') + '</button></div><p class="jgt-muted" style="margin-top:12px">' + t('กรอก email + password ที่ owner สร้างให้ แล้วเข้าได้เลย', 'Enter the email + password from your owner to log in directly') + ' · ' + t('ยังไม่มีบัญชี?', 'No account?') + ' <a href="#/signup" style="text-decoration:underline">' + t('สมัครสมาชิก', 'Sign up') + '</a></p></div>');
   // login แล้ว: สถานะ + logout, ช่อง URL/key เห็น/แก้ได้เฉพาะ owner
   var conn = isOwner() ? '<div class="jt-form" style="margin-top:12px"><label class="full">Supabase URL<input id="sb_url" value="' + esc(SB.url) + '"></label><label class="full">Anon key<input id="sb_key" value="' + esc((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || ls.key || '') + '"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbSave()">Save & connect</button><button class="btn d" onclick="SBClear()">Disconnect</button></div>' : '';
-  return jtShell(t('บัญชี', 'Account'), '#/admin/system/supabase', '<div class="jt-panel"><p>Login: <b>' + esc(SB_USER.email) + '</b> · <span class="bd">' + esc(roleLabel()) + '</span></p><div style="margin-top:12px"><button class="btn" onclick="sbLogout()">Logout</button></div>' + conn + '</div>');
+  return jtShell(t('บัญชี', 'Account'), '#/admin/system/supabase', '<div class="jt-panel"><p>Login: <b>' + esc(SB_USER.email) + '</b> · <span class="bd">' + esc(roleLabel()) + '</span></p><div class="jt-form" style="margin-top:12px"><label class="full">' + t('รหัสผ่านใหม่ (≥6 ตัว)', 'New password (min 6)') + '<input id="np_pass" type="password"></label></div><div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn s" onclick="sbChangePass()">' + t('เปลี่ยนรหัสผ่าน', 'Change password') + '</button><button class="btn" onclick="sbLogout()">Logout</button></div>' + conn + '</div>');
+}
+window.sbChangePass = async function () {
+  var c = sb(); var pw = ((document.getElementById('np_pass') || {}).value || '');
+  if (pw.length < 6) { T(t('รหัสผ่านอย่างน้อย 6 ตัว', 'Password min 6 chars')); return; }
+  var r = await c.auth.updateUser({ password: pw });
+  if (r.error) T(r.error.message); else T(t('เปลี่ยนรหัสผ่านแล้ว', 'Password changed'));
+};
 }
 window.sbSave = function () { var u = document.getElementById('sb_url').value.trim(), k = document.getElementById('sb_key').value.trim(); if (!u || !k) { T('กรอก URL + key'); return; } SB.saveConn(u, k); };
 window.SBClear = function () { SB.clearConn(); };
@@ -534,6 +565,27 @@ function tcur() { CUR = CUR == 'THB' ? 'USD' : 'THB'; try { localStorage.setItem
 function applyLogo() { cnt(); var cu = document.getElementById('cur'); if (cu) cu.textContent = CUR; applyHeader(); }
 function hc() { var m = (location.hash || '').match(/^#\/shop\?cat=(.+)$/); if (m) F.cat = decodeURIComponent(m[1]); }
 
+/* ---------- public signup (member) ---------- */
+function signupView() {
+  if (SB_USER) { location.hash = isStaff() ? '#/admin/dashboard' : '#/account/orders'; return '<p>...</p>'; }
+  return '<div class="jt-panel" style="max-width:520px;margin:24px auto"><h1 style="font-size:40px">' + t('สมัครสมาชิก', 'Sign up') + '</h1><div class="jt-form"><label class="full">Email<input id="su_email" type="email" placeholder="you@example.com"></label><label class="full">' + t('รหัสผ่าน (อย่างน้อย 6 ตัว)', 'Password (min 6 chars)') + '<input id="su_pass" type="password"></label><label class="full">' + t('ยืนยันรหัสผ่าน', 'Confirm password') + '<input id="su_pass2" type="password" onkeydown="if(event.key===\'Enter\')sbSignup()"></label></div><div style="margin-top:12px"><button class="btn p" onclick="sbSignup()">' + t('สมัครสมาชิก', 'Sign up') + '</button></div><p class="jgt-muted" style="margin-top:12px">' + t('มีบัญชีแล้ว?', 'Have an account?') + ' <a href="#/admin/system/supabase" style="text-decoration:underline">Login</a></p></div>';
+}
+window.sbSignup = async function () {
+  var c = sb(); if (!c) { T(t('ยังไม่ต่อ Supabase', 'Not connected')); return; }
+  var em = ((document.getElementById('su_email') || {}).value || '').trim();
+  var p1 = ((document.getElementById('su_pass') || {}).value || ''), p2 = ((document.getElementById('su_pass2') || {}).value || '');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { T(t('กรอกอีเมลให้ถูกต้อง', 'Enter a valid email')); return; }
+  if (p1.length < 6) { T(t('รหัสผ่านอย่างน้อย 6 ตัว', 'Password min 6 chars')); return; }
+  if (p1 !== p2) { T(t('รหัสผ่านไม่ตรงกัน', 'Passwords do not match')); return; }
+  var r = await c.auth.signUp({ email: em, password: p1 });
+  if (r.error) { T(r.error.message); return; }
+  if (r.data.session) {
+    SB_USER = r.data.session.user; await loadRole();
+    T(t('สมัครสำเร็จ ยินดีต้อนรับ', 'Welcome! Signed up'));
+    location.hash = '#/account/orders'; go();
+  } else T(t('สมัครแล้ว — เช็กอีเมลเพื่อยืนยันก่อน login', 'Signed up — check your email to confirm, then log in'));
+};
+
 /* ---------- account: my orders (member) ---------- */
 function myOrdersView() {
   if (!SB_USER) return jtShell(t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders', '<div class="jt-panel"><p>' + t('Login ก่อนเพื่อดูออเดอร์ของตัวเอง', 'Log in to see your orders') + '</p><a class="btn p" href="#/admin/system/supabase">Login</a></div>');
@@ -550,6 +602,7 @@ function go() {
   document.querySelector('main').className = isH ? 'h' : '';
   var v;
   if (h === '#/account/orders') v = myOrdersView();
+  else if (h === '#/signup') v = signupView();
   else if (h === '#/admin' || h === '#/admin/dashboard') v = isStaff() ? jtDashboard() : deny('Staff only');
   else if (h === '#/admin/products') v = isStaff() ? jtShell('Products', '#/admin/products', admin()) : deny('Staff only');
   else if (h === '#/admin/inventory') v = isStaff() ? jtInventory() : deny('Staff only');
