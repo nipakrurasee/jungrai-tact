@@ -41,6 +41,10 @@ function applyHeader() {
   try { document.documentElement.lang = LANG === 'TH' ? 'th' : 'en'; } catch (e) {}
   var set = function (id, v) { var e = document.getElementById(id); if (e) e.textContent = v; };
   set('nh', t('หน้าแรก', 'HOME')); set('ns', t('ร้านค้า', 'SHOP')); set('nct', t('ตะกร้า', 'CART')); set('lng', LANG === 'TH' ? 'EN' : 'TH');
+  set('ftag', t('เกิดมาเพื่อสนาม', 'Built for the field.')); set('fby', t('เกิดมาเพื่อสนาม', 'Built for the field.'));
+  set('fh1', t('ร้านค้า', 'Shop')); set('fh2', t('บริการลูกค้า', 'Customer service')); set('fh3', t('บริษัท', 'Company'));
+  set('fl1', t('จัดส่ง', 'Shipping')); set('fl2', t('คืนสินค้า', 'Returns')); set('fl3', t('ไกด์ไซส์', 'Size guide')); set('fl4', t('ติดต่อ', 'Contact'));
+  set('fl5', t('เกี่ยวกับเรา', 'About')); set('fl8', t('นโยบาย', 'Privacy')); set('fl9', t('เงื่อนไข', 'Terms'));
   var lg = document.getElementById('lg');
   if (lg) {
     if (!sb() || !SB_USER) { lg.textContent = t('เข้าสู่ระบบ', 'LOGIN'); lg.href = '#/admin/system/supabase'; }
@@ -77,7 +81,7 @@ function T(m) { var t = $('#toast'); if (!t) return; t.textContent = m; t.classL
 function thb(n) { return CUR == 'USD' ? '$' + Math.round(n / 35).toLocaleString('en-US') : '฿' + Number(n).toLocaleString('en-US'); }
 function bt(n) { return '฿' + Number(n).toLocaleString('en-US'); }
 function sb() { return (window.SB && SB.configured && SB.client) ? SB.client : null; }
-function av(p) { return p.stock <= 0 ? ['so', 'Sold out'] : p.stock <= p.low ? ['lo', 'Low stock — ' + p.stock + ' left'] : ['', 'In stock']; }
+function av(p) { return p.stock <= 0 ? ['so', t('หมด', 'Sold out')] : p.stock <= p.low ? ['lo', t('เหลือน้อย — เหลือ ', 'Low stock — ') + p.stock + t(' ชิ้น', ' left')] : ['', t('มีของ', 'In stock')]; }
 function art(p, c) {
   var h = CM[c || p.colors[0]] || '#5a5d3a', s = '';
   if (p.cat == 'Apparel') s = '<path d="M140 70l-70 40-40 120 40 10 20-60v250h220V180l20 60 40-10-40-120-70-40c-10 25-30 38-60 38s-50-13-60-38z"/><path d="M200 108v312" fill="none"/>';
@@ -114,7 +118,7 @@ function fixPG() {
 }
 function saveLocal() {
   try { localStorage.setItem('jg_cat', JSON.stringify(P)); } catch (e) {}
-  try { localStorage.setItem('jg_img', JSON.stringify(IM)); } catch (e) { T('Images are too large to keep in this browser'); }
+  try { localStorage.setItem('jg_img', JSON.stringify(IM)); } catch (e) { T(t('รูปใหญ่เกินเก็บในเบราว์เซอร์นี้', 'Images are too large to keep in this browser')); }
   try { localStorage.setItem('jg_cart', JSON.stringify(CART)); } catch (e) {}
   try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
 }
@@ -189,16 +193,16 @@ function prod(id) {
     '<div><span class="sm">' + t('ไซส์', 'Size') + '</span><div class="opt">' + p.sizes.map(function (s) { return '<button aria-pressed="' + (s == SEL.s) + '" onclick="SEL.s=\'' + esc(s) + '\';go()">' + esc(s) + '</button>'; }).join('') + '</div></div>' +
     '<div class="av ' + a[0] + '"><b></b>' + a[1] + '</div><div class="qty"><button aria-label="Less" onclick="Q=Math.max(1,Q-1);go()">–</button><span>' + Q + '</span><button aria-label="More" onclick="Q++;go()">+</button></div>' +
     (p.stock > 0 ? '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn p" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ')">' + t('หยิบใส่ตะกร้า', 'Add to cart') + '</button><button class="btn" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ',1);location.hash=\'#/checkout\'">' + t('ซื้อเลย', 'Buy now') + '</button></div>' : '<button class="btn" disabled style="opacity:.5">' + t('หมด', 'Sold out') + '</button>') +
-    '<div style="margin-top:12px">' + dt('Description', p.desc) + dt('Specifications', p.spec) + dt('Material', p.material) + dt('Dimensions', p.dims) + dt('Field notes', p.notes) + dt('Care', 'Machine wash cold, hang dry. Do not bleach.') + dt('Shipping', 'Ships within 1–2 business days across Thailand.') + dt('Returns', 'Unused items can be returned within 14 days.') + '</div></div></div>';
+    '<div style="margin-top:12px">' + dt(t('รายละเอียด', 'Description'), p.desc) + dt(t('สเปก', 'Specifications'), p.spec) + dt(t('วัสดุ', 'Material'), p.material) + dt(t('ขนาด', 'Dimensions'), p.dims) + dt(t('โน้ตภาคสนาม', 'Field notes'), p.notes) + dt(t('การดูแล', 'Care'), t('ซักน้ำเย็น ตากแห้ง ห้ามฟอกขาว', 'Machine wash cold, hang dry. Do not bleach.')) + dt(t('จัดส่ง', 'Shipping'), t('ส่งใน 1–2 วันทำการทั่วไทย', 'Ships within 1–2 business days across Thailand.')) + dt(t('คืนสินค้า', 'Returns'), t('ของไม่ใช้แล้วคืนได้ใน 14 วัน', 'Unused items can be returned within 14 days.')) + '</div></div></div>';
 }
 
 /* ---------- cart / checkout ---------- */
 function csave() { try { localStorage.setItem('jg_cart', JSON.stringify(CART)); } catch (e) {} cnt(); }
 function cadd(id, c, s, q, quiet) {
   var p = gp(id), mx = p ? p.stock : 0, f = CART.filter(function (x) { return x.id == id && x.c == c && x.s == s; })[0];
-  if (mx < 1) { T('Sold out'); return; }
+  if (mx < 1) { T(t('หมด', 'Sold out')); return; }
   if (f) f.qty = Math.min(mx, f.qty + q); else CART.push({ id: id, c: c, s: s, qty: Math.min(mx, q) });
-  csave(); if (!quiet) T('Added to cart');
+  csave(); if (!quiet) T(t('หยิบใส่ตะกร้าแล้ว', 'Added to cart'));
 }
 function cq(i, d) { var l = CART[i], p = gp(l.id); l.qty = Math.max(1, Math.min(p ? p.stock : 1, l.qty + d)); csave(); go(); }
 function crm(i) { CART.splice(i, 1); csave(); go(); }
@@ -209,7 +213,7 @@ function calc() {
   var ship = (sub == 0 || fs || sub - d >= (+PG.ship.free || 0)) ? 0 : (+PG.ship.rate || 0);
   return { sub: sub, d: d, ship: ship, total: sub - d + ship, code: c };
 }
-function dapply() { var v = ($('#dc').value || '').trim().toUpperCase(); DC = ''; if (v) { if (PG.codes.some(function (x) { return String(x.c).toUpperCase() == v; })) { DC = v; T('Code applied'); } else T('Code not found'); } go(); }
+function dapply() { var v = ($('#dc').value || '').trim().toUpperCase(); DC = ''; if (v) { if (PG.codes.some(function (x) { return String(x.c).toUpperCase() == v; })) { DC = v; T(t('ใช้โค้ดแล้ว', 'Code applied')); } else T(t('ไม่พบโค้ด', 'Code not found')); } go(); }
 function ln(l, v, b) { return '<div class="row"' + (b ? ' style="font:700 24px var(--hd);letter-spacing:.04em;border-top:1px solid var(--ln);padding-top:10px"' : '') + '><span>' + l + '</span><span>' + v + '</span></div>'; }
 function sumbox(r, cart) {
   return '<div style="display:grid;gap:10px;' + (cart ? 'max-width:420px;margin:32px 0 0 auto' : '') + '">' + (cart ? '<div style="display:flex;gap:8px"><input id="dc" placeholder="' + t('โค้ดส่วนลด', 'Discount code') + '" value="' + esc(DC) + '" style="flex:1"><button class="btn s" onclick="dapply()">' + t('ใช้', 'Apply') + '</button></div>' : '') + ln(t('ยอดรวมย่อย', 'Subtotal'), thb(r.sub)) + (r.d ? ln(t('ส่วนลด', 'Discount') + (DC ? ' (' + esc(DC) + ')' : ''), '– ' + thb(r.d)) : '') + (DC && r.code && r.code.t == 'ship' ? ln(t('ส่วนลด', 'Discount') + ' (' + esc(DC) + ')', t('ส่งฟรี', 'Free shipping')) : '') + ln(t('ค่าส่ง', 'Shipping'), r.ship ? thb(r.ship) : t('ฟรี', 'Free')) + ln(t('ยอดรวม', 'Total'), thb(r.total), 1) + (cart ? '<a class="btn p" style="text-align:center" href="#/checkout">' + t('ชำระเงิน', 'Checkout') + '</a>' : '') + '</div>';
@@ -232,24 +236,24 @@ function checkoutView() {
 }
 function place() {
   var g = function (i) { return (document.getElementById(i).value || '').trim(); }, em = g('em'), ph = g('ph').replace(/[\s-]/g, '').replace(/^\+66/, '0'), zp = g('zp'), err = null;
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) err = 'Enter a valid email address';
-  else if (!g('nm')) err = 'Enter your full name';
-  else if (!/^0\d{8,9}$/.test(ph)) err = 'Enter a Thai phone number, e.g. 081 234 5678';
-  else if (!g('ad') || !g('sd') || !g('ds') || !g('pv')) err = 'Complete the address';
-  else if (!/^\d{5}$/.test(zp)) err = 'Postcode must be 5 digits';
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) err = t('กรอกอีเมลให้ถูกต้อง', 'Enter a valid email address');
+  else if (!g('nm')) err = t('กรอกชื่อ-นามสกุล', 'Enter your full name');
+  else if (!/^0\d{8,9}$/.test(ph)) err = t('กรอกเบอร์ไทย เช่น 081 234 5678', 'Enter a Thai phone number, e.g. 081 234 5678');
+  else if (!g('ad') || !g('sd') || !g('ds') || !g('pv')) err = t('กรอกที่อยู่ให้ครบ', 'Complete the address');
+  else if (!/^\d{5}$/.test(zp)) err = t('รหัสไปรษณีย์ต้อง 5 หลัก', 'Postcode must be 5 digits');
   if (err) { T(err); return; }
   var items = [], bad = 0;
   CART.forEach(function (l) { var p = gp(l.id); if (!p || p.stock < l.qty) { bad = 1; return; } items.push({ id: p.id, name: p.name, sku: p.sku, c: l.c, s: l.s, qty: l.qty, price: p.price }); });
-  if (bad || !items.length) { T('Some items are no longer available.'); return; }
+  if (bad || !items.length) { T(t('บางชิ้นหมดแล้ว ปรับตะกร้าใหม่', 'Some items are no longer available.')); return; }
   var r = calc(), now = new Date().toISOString();
   var o = { no: 'JT-' + Date.now().toString(36).toUpperCase(), at: now, cust: { email: em, name: g('nm'), phone: ph }, addr: { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp }, items: items, sub: r.sub, d: r.d, ship: r.ship, total: r.total, code: DC, pay: document.querySelector('input[name=pay]:checked').value, status: 'new', track: '', note: '', stockDone: 0, log: [{ t: now, s: 'Order placed' }] };
   ORDS[o.no] = o; try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
   dbSaveOrder(o); CART = []; DC = ''; csave(); location.hash = '#/done/' + o.no;
 }
 function doneView(no) {
-  var o = ORDS[no]; if (!o) return '<div class="top"><h1>Order not found</h1></div>';
-  var m = { promptpay: 'Pay ' + bt(o.total) + ' with PromptPay. QR จะแสดงหลังต่อ payment provider', card: 'Card payment ยังไม่ต่อ provider — ยังไม่ตัดเงิน', bank: 'โอนแล้วแจ้งสลิปพร้อมเลข ' + esc(o.no) }[o.pay];
-  return '<div class="top"><h1>Order placed</h1></div><p>Order <b>' + esc(o.no) + '</b></p><div class="fm" style="grid-template-columns:1fr;max-width:640px;margin-top:24px"><h3 style="font-size:28px">Next: payment</h3><p>' + m + '</p></div><a class="btn" href="#/shop">Continue shopping</a>';
+  var o = ORDS[no]; if (!o) return '<div class="top"><h1>' + t('ไม่พบคำสั่งซื้อ', 'Order not found') + '</h1></div>';
+  var m = { promptpay: t('จ่าย ', 'Pay ') + bt(o.total) + t(' ด้วย PromptPay QR จะแสดงหลังต่อ payment provider', ' with PromptPay. QR shows after connecting a provider'), card: t('จ่ายบัตรผ่าน provider — ยังไม่ต่อ ยังไม่ตัดเงิน', 'Card payment not connected yet — no charge'), bank: t('โอนแล้วแจ้งสลิปพร้อมเลข ', 'Transfer then send slip with order ') + esc(o.no) }[o.pay];
+  return '<div class="top"><h1>' + t('สั่งซื้อสำเร็จ', 'Order placed') + '</h1></div><p>' + t('เลขคำสั่งซื้อ ', 'Order ') + '<b>' + esc(o.no) + '</b></p><div class="fm" style="grid-template-columns:1fr;max-width:640px;margin-top:24px"><h3 style="font-size:28px">' + t('ขั้นตอนถัดไป: ชำระเงิน', 'Next: payment') + '</h3><p>' + m + '</p></div><a class="btn" href="#/shop">' + t('ช้อปต่อ', 'Continue shopping') + '</a>';
 }
 
 /* ---------- home ---------- */
@@ -259,18 +263,18 @@ function card(p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p
 function homeView() {
   var sl = H.slides, sh = PG.show, CC = ['#2f3123', '#3a352a', '#2a2b2a', '#4a4d33'], SC = ['#2d2f22', '#232420', '#2d2a21', '#1b1c19', '#35382a'];
   var h = '<div class="hero">' + sl.map(function (s, i) { var u = simg(s.img); return '<div class="sl' + (i ? '' : ' on') + '">' + (u ? '<img src="' + u + '" alt="">' : '') + '<div class="tx"><h1>' + esc(s.h) + '</h1>' + (s.sub ? '<p>' + esc(s.sub) + '</p>' : '') + (s.b1 ? '<a class="btn p" href="' + esc(safe(s.l1)) + '">' + esc(s.b1) + '</a>' : '') + (s.b2 ? '<a class="btn" href="' + esc(safe(s.l2)) + '">' + esc(s.b2) + '</a>' : '') + '</div></div>'; }).join('') + (sl.length > 1 ? '<div class="hd">' + sl.map(function (s, i) { return '<button aria-label="Slide ' + (i + 1) + '" class="' + (i ? '' : 'on') + '" onclick="hshow(' + i + ',1)"></button>'; }).join('') + '</div>' : '') + '</div>';
-  if (sh.cats) h += '<section class="sec"><div class="w"><div class="top"><h2 style="font-size:clamp(40px,6vw,88px)">Collection</h2><a class="sm" href="#/shop">View all</a></div><div class="cats">' + PG.cats.map(function (c, i) { return '<a class="cat pn" href="' + esc(safe(c.l)) + '" style="background:linear-gradient(160deg,' + CC[i % 4] + ',#12130f)"><h3>' + esc(c.t) + '</h3></a>'; }).join('') + '</div></div></section>';
+  if (sh.cats) h += '<section class="sec"><div class="w"><div class="top"><h2 style="font-size:clamp(40px,6vw,88px)">' + t('คอลเลกชัน', 'Collection') + '</h2><a class="sm" href="#/shop">' + t('ดูทั้งหมด', 'View all') + '</a></div><div class="cats">' + PG.cats.map(function (c, i) { return '<a class="cat pn" href="' + esc(safe(c.l)) + '" style="background:linear-gradient(160deg,' + CC[i % 4] + ',#12130f)"><h3>' + esc(c.t) + '</h3></a>'; }).join('') + '</div></div></section>';
   if (sh.brand) h += '<section class="sec st"><div class="w"><h2>' + esc(PG.brand.h) + '</h2><p>' + esc(PG.brand.p) + '</p></div></section>';
   var fp = list().filter(function (p) { return p.featured; })[0];
-  if (sh.featured && fp) { var a = av(fp); h += '<div class="fp"><div class="pn">' + pic(fp, 0) + '</div><div class="in2"><span class="sm">' + esc(fp.coll) + '</span><h2>' + esc(fp.name) + '</h2><div class="price" style="font:700 32px var(--hd)">' + thb(fp.price) + '</div><p style="color:#b9b8ae;max-width:46ch">' + esc(fp.desc) + '</p><div class="av ' + a[0] + '"><b></b>' + a[1] + '</div><div><a class="btn p" href="#/p/' + esc(fp.id) + '">View product</a></div></div></div>'; }
-  if (sh.stories) h += '<section class="sec"><div class="w"><div class="top"><h2 style="font-size:clamp(40px,6vw,88px)">Field stories</h2></div><div class="sg">' + PG.stories.map(function (c, i) { return '<a class="sc pn" href="' + esc(safe(c.l)) + '" style="background:linear-gradient(180deg,' + SC[i % 5] + ',#0e0e0b)"><span class="sm">' + esc(c.k) + '</span><h3>' + esc(c.t) + '</h3></a>'; }).join('') + '</div></div></section>';
-  var d = PG.drop; if (sh.drop && d.on) h += '<div class="drop"><div class="w"><div><span class="sm">' + esc(d.label) + '</span><h2>' + esc(d.h) + '</h2></div><div><div class="cdn"><div><b id="dd">00</b><span class="sm">Days</span></div><div><b id="dh">00</b><span class="sm">Hours</span></div><div><b id="dm">00</b><span class="sm">Min</span></div><div><b id="ds">00</b><span class="sm">Sec</span></div></div><p style="margin-bottom:20px">' + esc(d.p) + '</p>' + (d.b ? '<a class="btn" href="' + esc(safe(d.l)) + '">' + esc(d.b) + '</a>' : '') + '</div></div></div>';
-  if (sh.news) h += '<section class="sec nl"><div class="w"><h2 style="font-size:clamp(40px,7vw,100px)">' + esc(PG.news.h) + '</h2>' + (PG.news.p ? '<p style="color:#b9b8ae;margin-top:12px">' + esc(PG.news.p) + '</p>' : '') + '<form onsubmit="nsub(event)"><input type="email" required placeholder="email@example.com"><button type="submit">Subscribe</button></form></div></section>';
+  if (sh.featured && fp) { var a = av(fp); h += '<div class="fp"><div class="pn">' + pic(fp, 0) + '</div><div class="in2"><span class="sm">' + esc(fp.coll) + '</span><h2>' + esc(fp.name) + '</h2><div class="price" style="font:700 32px var(--hd)">' + thb(fp.price) + '</div><p style="color:#b9b8ae;max-width:46ch">' + esc(fp.desc) + '</p><div class="av ' + a[0] + '"><b></b>' + a[1] + '</div><div><a class="btn p" href="#/p/' + esc(fp.id) + '">' + t('ดูสินค้า', 'View product') + '</a></div></div></div>'; }
+  if (sh.stories) h += '<section class="sec"><div class="w"><div class="top"><h2 style="font-size:clamp(40px,6vw,88px)">' + t('เรื่องจากภาคสนาม', 'Field stories') + '</h2></div><div class="sg">' + PG.stories.map(function (c, i) { return '<a class="sc pn" href="' + esc(safe(c.l)) + '" style="background:linear-gradient(180deg,' + SC[i % 5] + ',#0e0e0b)"><span class="sm">' + esc(c.k) + '</span><h3>' + esc(c.t) + '</h3></a>'; }).join('') + '</div></div></section>';
+  var d = PG.drop; if (sh.drop && d.on) h += '<div class="drop"><div class="w"><div><span class="sm">' + esc(d.label) + '</span><h2>' + esc(d.h) + '</h2></div><div><div class="cdn"><div><b id="dd">00</b><span class="sm">' + t('วัน', 'Days') + '</span></div><div><b id="dh">00</b><span class="sm">' + t('ชม.', 'Hours') + '</span></div><div><b id="dm">00</b><span class="sm">' + t('นาที', 'Min') + '</span></div><div><b id="ds">00</b><span class="sm">' + t('วิ', 'Sec') + '</span></div></div><p style="margin-bottom:20px">' + esc(d.p) + '</p>' + (d.b ? '<a class="btn" href="' + esc(safe(d.l)) + '">' + esc(d.b) + '</a>' : '') + '</div></div></div>';
+  if (sh.news) h += '<section class="sec nl"><div class="w"><h2 style="font-size:clamp(40px,7vw,100px)">' + esc(PG.news.h) + '</h2>' + (PG.news.p ? '<p style="color:#b9b8ae;margin-top:12px">' + esc(PG.news.p) + '</p>' : '') + '<form onsubmit="nsub(event)"><input type="email" required placeholder="email@example.com"><button type="submit">' + t('สมัคร', 'Subscribe') + '</button></form></div></section>';
   return h;
 }
 function hshow(i, m) { var l = document.querySelectorAll('.sl'), d = document.querySelectorAll('.hd button'); if (!l.length) return; HK = i % l.length; l.forEach(function (e, j) { e.classList.toggle('on', j == HK); }); d.forEach(function (e, j) { e.classList.toggle('on', j == HK); }); if (m) heroInit(1); }
 function heroInit(k) { clearInterval(HT); if (!k) HK = 0; if (H.slides.length < 2) return; HT = setInterval(function () { hshow(HK + 1); }, Math.max(3, H.secs || 7) * 1000); }
-function nsub(e) { e.preventDefault(); T('Subscribed. See you in the field.'); e.target.reset(); }
+function nsub(e) { e.preventDefault(); T(t('สมัครแล้ว เจอกันในสนาม', 'Subscribed. See you in the field.')); e.target.reset(); }
 function dropInit() {
   clearInterval(HT2); if (!document.getElementById('dd')) return;
   function t() { var d = new Date((PG.drop.at || '') + ':00+07:00').getTime() - Date.now(); d = isNaN(d) ? 0 : Math.max(0, d); var p = function (x) { return String(x).padStart(2, '0'); }, set = function (i, v) { var e = document.getElementById(i); if (e) e.textContent = v; }; set('dd', p(Math.floor(d / 864e5))); set('dh', p(Math.floor(d / 36e5) % 24)); set('dm', p(Math.floor(d / 6e4) % 60)); set('ds', p(Math.floor(d / 1e3) % 60)); }
@@ -280,9 +284,9 @@ function dropInit() {
 /* ---------- admin: products ---------- */
 function fld(k, l, t, c) { var v = E[k]; if (Array.isArray(v)) v = v.join(', '); return '<label class="' + (c || '') + '">' + l + (t == 'ta' ? '<textarea data-k="' + k + '">' + esc(v) + '</textarea>' : '<input data-k="' + k + '" type="' + (t || 'text') + '" value="' + esc(v) + '">') + '</label>'; }
 function admin() {
-  var h = '<div class="top"><h1>Products</h1>' + (isOwner() ? '<button class="btn p" onclick="edit(-1)">New product</button>' : '<span class="sm">' + esc(roleLabel()) + (myRole() === 'shop_admin' ? ' · แก้ได้เฉพาะสต็อก' : '') + '</span>') + '</div>' + (sb() ? (SB_USER ? '<p class="sm">Supabase · ' + esc(SB_USER.email) + ' · ' + esc(roleLabel()) + ' · <a href="#" onclick="sbLogout();return false" style="text-decoration:underline">logout</a></p>' : '<p class="sm">Supabase connected · <a href="#/admin/system/supabase" style="text-decoration:underline">login เพื่อเขียนข้อมูล</a></p>') : '<div class="note">Local mode — ต่อ Supabase ที่เมนู SYSTEM › Supabase</div>');
+  var h = '<div class="top"><h1>' + t('สินค้า', 'Products') + '</h1>' + (isOwner() ? '<button class="btn p" onclick="edit(-1)">' + t('เพิ่มสินค้า', 'New product') + '</button>' : '<span class="sm">' + esc(roleLabel()) + (myRole() === 'shop_admin' ? t(' · แก้ได้เฉพาะสต็อก', ' · stock only') : '') + '</span>') + '</div>' + (sb() ? (SB_USER ? '<p class="sm">Supabase · ' + esc(SB_USER.email) + ' · ' + esc(roleLabel()) + ' · <a href="#" onclick="sbLogout();return false" style="text-decoration:underline">logout</a></p>' : '<p class="sm">Supabase connected · <a href="#/admin/system/supabase" style="text-decoration:underline">' + t('login เพื่อเขียนข้อมูล', 'login to edit') + '</a></p>') : '<div class="note">' + t('Local mode — ต่อ Supabase ที่เมนู SYSTEM › Supabase', 'Local mode — connect Supabase under SYSTEM › Supabase') + '</div>');
   if (E) h += form();
-  h += '<div class="sc"><table class="tb"><tr><th>Product</th><th>SKU</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>' + P.map(function (p, i) { return '<tr><td>' + esc(p.name) + (p.featured ? ' <span class="sm">★</span>' : '') + '</td><td>' + esc(p.sku) + '</td><td>' + thb(p.price) + '</td><td' + (p.stock <= p.low ? ' style="color:var(--sd)"' : '') + '>' + p.stock + '</td><td><span class="bd ' + p.status + '">' + p.status + '</span></td><td><button class="btn s" onclick="edit(' + i + ')">' + (myRole() === 'shop_admin' ? 'Stock' : 'Edit') + '</button>' + (isStaff() ? ' <button class="btn s" onclick="arch(' + i + ')">' + (p.status == 'archived' ? 'Restore' : 'Archive') + '</button>' : '') + (isOwner() ? ' <button class="btn s d" onclick="del(' + i + ')">Delete</button>' : '') + '</td></tr>'; }).join('') + '</table></div>'; return h;
+  h += '<div class="sc"><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>SKU</th><th>' + t('ราคา', 'Price') + '</th><th>' + t('สต็อก', 'Stock') + '</th><th>' + t('สถานะ', 'Status') + '</th><th></th></tr>' + P.map(function (p, i) { return '<tr><td>' + esc(p.name) + (p.featured ? ' <span class="sm">★</span>' : '') + '</td><td>' + esc(p.sku) + '</td><td>' + thb(p.price) + '</td><td' + (p.stock <= p.low ? ' style="color:var(--sd)"' : '') + '>' + p.stock + '</td><td><span class="bd ' + p.status + '">' + p.status + '</span></td><td><button class="btn s" onclick="edit(' + i + ')">' + (myRole() === 'shop_admin' ? t('สต็อก', 'Stock') : t('แก้', 'Edit')) + '</button>' + (isStaff() ? ' <button class="btn s" onclick="arch(' + i + ')">' + (p.status == 'archived' ? t('กู้คืน', 'Restore') : t('เก็บ', 'Archive')) + '</button>' : '') + (isOwner() ? ' <button class="btn s d" onclick="del(' + i + ')">' + t('ลบ', 'Delete') + '</button>' : '') + '</td></tr>'; }).join('') + '</table></div>'; return h;
 }
 function form() {
   var ro = myRole() === 'shop_admin' ? '<div class="note w4">Shop admin: แก้ได้เฉพาะ Stock / Low threshold / Status — ช่องอื่นจะถูกคงค่าเดิมตอนบันทึก</div>' : '';
@@ -291,7 +295,7 @@ function form() {
     '<label>Status<select data-k="status">' + ['active', 'draft', 'archived'].map(function (c) { return '<option' + (E.status == c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label>' +
     '<label>Featured<select data-k="featured"><option value="0">No</option><option value="1"' + (E.featured ? ' selected' : '') + '>Yes</option></select></label>' +
     fld('price', 'Price (THB)', 'number') + fld('compare', 'Compare-at', 'number') + fld('cost', 'Cost', 'number') + fld('stock', 'Stock', 'number') + fld('low', 'Low threshold', 'number') +
-    fld('colors', 'Colors (comma)', '', 'w2') + fld('sizes', 'Sizes (comma)', '', 'w2') + fld('tags', 'Tags', '', 'w4') + fld('desc', 'Short description', 'ta', 'w4') + fld('spec', 'Specifications', 'ta', 'w2') + fld('material', 'Material', 'ta', 'w2') + fld('dims', 'Dimensions', 'ta', 'w2') + fld('notes', 'Field notes', 'ta', 'w2') + imgui() + '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">Save product</button><button class="btn" onclick="E=null;go()">Cancel</button></div></div>';
+    fld('colors', 'Colors (comma)', '', 'w2') + fld('sizes', 'Sizes (comma)', '', 'w2') + fld('tags', 'Tags', '', 'w4') + fld('desc', 'Short description', 'ta', 'w4') + fld('spec', 'Specifications', 'ta', 'w2') + fld('material', 'Material', 'ta', 'w2') + fld('dims', 'Dimensions', 'ta', 'w2') + fld('notes', 'Field notes', 'ta', 'w2') + imgui() + '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">' + t('บันทึกสินค้า', 'Save product') + '</button><button class="btn" onclick="E=null;go()">' + t('ยกเลิก', 'Cancel') + '</button></div></div>';
 }
 function edit(i) { E = i < 0 ? mk('new-' + Date.now().toString(36), '', 'Apparel', 'Core', 0, 0, 0, 0, ['Black'], ['One size'], 0, '') : JSON.parse(JSON.stringify(P[i])); E._i = i; EI = (IM[E.id] || []).slice(); if (i < 0) { E.status = 'draft'; E.sku = ''; } go(); var f = $('#fm'); f && f.scrollIntoView({ behavior: 'smooth' }); }
 async function commit() {
@@ -299,7 +303,7 @@ async function commit() {
   if (!isOwner() && myRole() === 'shop_admin' && arguments.length === 0) { /* stock-only enforced below */ }
   var o = JSON.parse(JSON.stringify(E)), i = o._i; delete o._i;
   document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k, v = e.value; if (['price', 'compare', 'cost', 'stock', 'low'].indexOf(k) > -1) v = Math.max(0, parseInt(v, 10) || 0); else if (k == 'colors' || k == 'sizes') v = v.split(',').map(function (x) { return x.trim(); }).filter(Boolean); else if (k == 'featured') v = v == '1' ? 1 : 0; o[k] = v; });
-  if (!o.name.trim()) { T('Enter a product name'); return; }
+  if (!o.name.trim()) { T(t('กรอกชื่อสินค้า', 'Enter a product name')); return; }
   if (!o.colors.length) o.colors = ['Black']; if (!o.sizes.length) o.sizes = ['One size'];
   if (o._new !== false && i < 0) o.id = 'p-' + Date.now().toString(36);
   if (!o.sku.trim()) o.sku = o.id.toUpperCase();
@@ -311,16 +315,16 @@ async function commit() {
   if (i < 0) P.push(o); else { o.id = P[i].id; P[i] = o; }
   IM[o.id] = EI.slice(0, 4);
   saveLocal(); await dbUpsertProduct(o);
-  E = null; T('Saved'); go();
+  E = null; T(t('บันทึกแล้ว', 'Saved')); go();
 }
 async function arch(i) { if (!isStaff()) { T('ต้อง login เป็น staff'); return; } P[i].status = P[i].status == 'archived' ? 'draft' : 'archived'; saveLocal(); await dbUpsertProduct(P[i]); go(); }
-async function del(i) { if (!isOwner()) { T('ลบสินค้าได้เฉพาะ owner'); return; } if (!confirm('Delete "' + P[i].name + '"?')) return; var id = P[i].id; P.splice(i, 1); delete IM[id]; saveLocal(); await dbDeleteProduct(id); go(); }
+async function del(i) { if (!isOwner()) { T('ลบสินค้าได้เฉพาะ owner'); return; } if (!confirm(t('ลบ "', 'Delete "') + P[i].name + '"?')) return; var id = P[i].id; P.splice(i, 1); delete IM[id]; saveLocal(); await dbDeleteProduct(id); go(); }
 
 /* ---------- images (Storage-first) ---------- */
 function sync() { document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k; E[k] = k == 'featured' ? (e.value == '1' ? 1 : 0) : e.value; }); }
 function redraw() { var y = scrollY; go(); scrollTo(0, y); }
 function imgui() {
-  return '<div class="w4"><span>Product images (' + EI.length + '/4)' + (sb() ? ' · Supabase Storage' : ' · local') + '</span><div class="im" style="margin-top:8px">' + EI.map(function (s, i) { return '<div><div class="pn"><img src="' + s + '" alt=""></div><div style="display:flex;gap:6px"><button class="btn s" onclick="imv(' + i + ')"' + (i ? '' : ' disabled') + '>Make first</button><button class="btn s d" onclick="irm(' + i + ')">Remove</button></div></div>'; }).join('') + '</div>' + (EI.length < 4 ? '<button class="btn s" style="margin-top:10px" onclick="document.getElementById(\'fi\').click()">Upload images</button><input id="fi" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onchange="iup(this.files)">' : '') + '<p style="font-size:12px">JPG/PNG/WebP สูงสุด 4 รูป รูปแรกคือปก ย่อเหลือ 1000px อัตโนมัติ' + (sb() ? ' อัปโหลดเข้า Storage bucket product-images' : '') + '</p></div>';
+  return '<div class="w4"><span>' + t('รูปสินค้า', 'Product images') + ' (' + EI.length + '/4)' + (sb() ? ' · Supabase Storage' : ' · local') + '</span><div class="im" style="margin-top:8px">' + EI.map(function (s, i) { return '<div><div class="pn"><img src="' + s + '" alt=""></div><div style="display:flex;gap:6px"><button class="btn s" onclick="imv(' + i + ')"' + (i ? '' : ' disabled') + '>' + t('ตั้งเป็นปก', 'Make first') + '</button><button class="btn s d" onclick="irm(' + i + ')">' + t('ลบ', 'Remove') + '</button></div></div>'; }).join('') + '</div>' + (EI.length < 4 ? '<button class="btn s" style="margin-top:10px" onclick="document.getElementById(\'fi\').click()">' + t('อัปโหลดรูป', 'Upload images') + '</button><input id="fi" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onchange="iup(this.files)">' : '') + '<p style="font-size:12px">JPG/PNG/WebP ' + t('สูงสุด 4 รูป รูปแรกคือปก ย่อเหลือ 1000px อัตโนมัติ', 'up to 4 images, first is cover, auto-resized to 1000px') + (sb() ? t(' อัปโหลดเข้า Storage bucket product-images', ' · uploads to product-images bucket') : '') + '</p></div>';
 }
 function imv(i) { sync(); EI.unshift(EI.splice(i, 1)[0]); redraw(); }
 function irm(i) { sync(); EI.splice(i, 1); redraw(); }
@@ -329,21 +333,21 @@ function rsBlob(f, m) {
   return new Promise(function (res) {
     var im = new Image(), u = URL.createObjectURL(f);
     im.onload = function () { var k = Math.min(1, m / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); var x = c.getContext('2d'); x.fillStyle = '#1a1b19'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(function (b) { c.toDataURL && 0; res({ blob: b, dataUrl: c.toDataURL('image/jpeg', .72) }); }, 'image/jpeg', .72); };
-    im.onerror = function () { URL.revokeObjectURL(u); T('Could not read ' + f.name); res(null); }; im.src = u;
+    im.onerror = function () { URL.revokeObjectURL(u); T(t('อ่านไฟล์ไม่ได้ ', 'Could not read ') + f.name); res(null); }; im.src = u;
   });
 }
 async function iup(fs) {
   sync(); var ok = ['image/jpeg', 'image/png', 'image/webp'], all = [].slice.call(fs), l = all.slice(0, 4 - EI.length);
-  if (all.length > l.length) T('Only 4 images per product');
+  if (all.length > l.length) T(t('ได้สูงสุด 4 รูปต่อสินค้า', 'Only 4 images per product'));
   for (var j = 0; j < l.length; j++) {
     var f = l[j];
-    if (ok.indexOf(f.type) < 0 || f.size > 15e6) { T('Skipped ' + f.name); continue; }
+    if (ok.indexOf(f.type) < 0 || f.size > 15e6) { T(t('ข้าม ', 'Skipped ') + f.name); continue; }
     var r = await rsBlob(f); if (!r) continue;
     var c = sb();
     if (c && E && E.id) {
       var path = E.id + '/' + Date.now().toString(36) + '-' + j + '.jpg';
       var up = await c.storage.from('product-images').upload(path, r.blob, { contentType: 'image/jpeg', upsert: true });
-      if (up.error) { T('Upload failed, kept locally'); EI.push(r.dataUrl); }
+      if (up.error) { T(t('อัปโหลดไม่สำเร็จ เก็บแบบ local', 'Upload failed, kept locally')); EI.push(r.dataUrl); }
       else { var pub = c.storage.from('product-images').getPublicUrl(path); EI.push(pub.data.publicUrl); }
     } else EI.push(r.dataUrl);
   }
@@ -355,11 +359,11 @@ function adminHome() {
   if (!HS) HS = JSON.parse(JSON.stringify(H)); var s = HS.slides;
   function inp(i, k, l, ph, c) { return '<label class="' + (c || '') + '">' + l + '<input value="' + esc(HS.slides[i][k]) + '" placeholder="' + (ph || '') + '" oninput="hset(' + i + ',\'' + k + '\',this.value)"></label>'; }
   function hck(k, l) { return '<label style="flex-direction:row;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ow)"><input type="checkbox"' + (HS[k] ? ' checked' : '') + ' onchange="HS.' + k + '=this.checked?1:0" style="width:18px;height:18px;min-width:0">' + l + '</label>'; }
-  return '<div class="top"><h1>Homepage</h1><button class="btn p" onclick="hsave()">Save homepage</button></div>' + (sb() ? '' : '<div class="note">Local mode</div>') +
-    '<div class="fm" style="grid-template-columns:1fr">' + hck('logo', 'Show brand logo') + hck('wm', 'Show watermark') + '<label>Seconds per slide<input type="number" min="3" max="30" value="' + HS.secs + '" oninput="HS.secs=Math.min(30,Math.max(3,+this.value||7))"></label></div>' +
-    s.map(function (x, i) { var u = simg(x.img); return '<div class="fm" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))"><div style="display:grid;gap:8px;align-content:start"><div class="pn" style="aspect-ratio:16/9">' + (u ? '<img src="' + u + '" alt="">' : '<span style="position:absolute;inset:0;display:grid;place-items:center;z-index:1;font-size:12px">No image</span>') + '</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn s" onclick="document.getElementById(\'hf' + i + '\').click()">' + (u ? 'Replace' : 'Upload') + '</button>' + (u ? '<button class="btn s d" onclick="hset(' + i + ',\'img\',\'\',1)">Remove</button>' : '') + '<input id="hf' + i + '" type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="hup(' + i + ',this.files)"></div></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' + inp(i, 'h', 'Headline', '', 'w2') + inp(i, 'sub', 'Subheadline', '', 'w2') + inp(i, 'b1', 'Button 1') + inp(i, 'l1', 'Link 1', '#/shop') + inp(i, 'b2', 'Button 2') + inp(i, 'l2', 'Link 2', '#/shop') +
-      '<div class="w2" style="display:flex;gap:8px"><button class="btn s" onclick="hmv(' + i + ',-1)"' + (i ? '' : ' disabled') + '>Up</button><button class="btn s" onclick="hmv(' + i + ',1)"' + (i < s.length - 1 ? '' : ' disabled') + '>Down</button><button class="btn s d" onclick="hdel(' + i + ')"' + (s.length > 1 ? '' : ' disabled') + '>Delete</button></div></div></div>'; }).join('') + (s.length < 6 ? '<button class="btn" onclick="hadd()">Add slide</button>' : '');
+  return '<div class="top"><h1>' + t('หน้าแรก', 'Homepage') + '</h1><button class="btn p" onclick="hsave()">' + t('บันทึกหน้าแรก', 'Save homepage') + '</button></div>' + (sb() ? '' : '<div class="note">Local mode</div>') +
+    '<div class="fm" style="grid-template-columns:1fr">' + hck('logo', t('โชว์โลโก้', 'Show brand logo')) + hck('wm', t('โชว์ลายน้ำ', 'Show watermark')) + '<label>' + t('วินาทีต่อสไลด์', 'Seconds per slide') + '<input type="number" min="3" max="30" value="' + HS.secs + '" oninput="HS.secs=Math.min(30,Math.max(3,+this.value||7))"></label></div>' +
+    s.map(function (x, i) { var u = simg(x.img); return '<div class="fm" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))"><div style="display:grid;gap:8px;align-content:start"><div class="pn" style="aspect-ratio:16/9">' + (u ? '<img src="' + u + '" alt="">' : '<span style="position:absolute;inset:0;display:grid;place-items:center;z-index:1;font-size:12px">' + t('ไม่มีรูป', 'No image') + '</span>') + '</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn s" onclick="document.getElementById(\'hf' + i + '\').click()">' + (u ? t('เปลี่ยน', 'Replace') : t('อัปโหลด', 'Upload')) + '</button>' + (u ? '<button class="btn s d" onclick="hset(' + i + ',\'img\',\'\',1)">' + t('ลบ', 'Remove') + '</button>' : '') + '<input id="hf' + i + '" type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="hup(' + i + ',this.files)"></div></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' + inp(i, 'h', t('หัวข้อ', 'Headline'), '', 'w2') + inp(i, 'sub', t('หัวข้อรอง', 'Subheadline'), '', 'w2') + inp(i, 'b1', t('ปุ่ม 1', 'Button 1')) + inp(i, 'l1', t('ลิงก์ 1', 'Link 1'), '#/shop') + inp(i, 'b2', t('ปุ่ม 2', 'Button 2')) + inp(i, 'l2', t('ลิงก์ 2', 'Link 2'), '#/shop') +
+      '<div class="w2" style="display:flex;gap:8px"><button class="btn s" onclick="hmv(' + i + ',-1)"' + (i ? '' : ' disabled') + '>' + t('ขึ้น', 'Up') + '</button><button class="btn s" onclick="hmv(' + i + ',1)"' + (i < s.length - 1 ? '' : ' disabled') + '>' + t('ลง', 'Down') + '</button><button class="btn s d" onclick="hdel(' + i + ')"' + (s.length > 1 ? '' : ' disabled') + '>' + t('ลบ', 'Delete') + '</button></div></div></div>'; }).join('') + (s.length < 6 ? '<button class="btn" onclick="hadd()">' + t('เพิ่มสไลด์', 'Add slide') + '</button>' : '');
 }
 function hset(i, k, v, r) { HS.slides[i][k] = v; if (r) redraw(); }
 function hmv(i, d) { var a = HS.slides; a.splice(i + d, 0, a.splice(i, 1)[0]); redraw(); }
@@ -376,7 +380,7 @@ async function hsave() {
   if (!isOwner()) { T('แก้หน้าเว็บได้เฉพาะ owner'); return; }
   H = JSON.parse(JSON.stringify(HS));
   try { localStorage.setItem('jg_home', JSON.stringify(H)); } catch (e) {}
-  await dbSavePage(); T('Homepage saved');
+  await dbSavePage(); T(t('บันทึกหน้าแรกแล้ว', 'Homepage saved'));
 }
 function pget(o, p) { return p.split('.').reduce(function (a, k) { return a && a[k]; }, o); }
 function pset(p, v) { var a = p.split('.'), o = PGS; for (var i = 0; i < a.length - 1; i++) o = o[a[i]]; o[a[a.length - 1]] = v; }
@@ -386,31 +390,31 @@ function psel(p, l, o, c) { var v = pget(PGS, p); return '<label class="' + (c |
 function adminSec() {
   if (!PGS) PGS = JSON.parse(JSON.stringify(PG));
   var h3 = function (t) { return '<h3 class="w4" style="font-size:28px">' + t + '</h3>'; }, x = '';
-  x += '<div class="fm">' + h3('Show/hide') + [['cats', 'Collection'], ['brand', 'Brand'], ['featured', 'Featured'], ['stories', 'Stories'], ['drop', 'Drop'], ['news', 'Newsletter']].map(function (a) { return pck('show.' + a[0], a[1]); }).join('') + '</div>';
-  x += '<div class="fm">' + h3('Collection cards') + [0, 1, 2, 3].map(function (i) { return pin('cats.' + i + '.t', 'Card ' + (i + 1), '', 'w2') + pin('cats.' + i + '.l', 'Link', '', 'w2'); }).join('') + '</div>';
-  x += '<div class="fm">' + h3('Brand') + pin('brand.h', 'Headline', '', 'w4') + pin('brand.p', 'Paragraph', 'ta', 'w4') + '</div>';
-  x += '<div class="fm">' + h3('Stories') + [0, 1, 2, 3, 4].map(function (i) { return pin('stories.' + i + '.k', 'Label') + pin('stories.' + i + '.t', 'Title', '', 'w2') + pin('stories.' + i + '.l', 'Link'); }).join('') + '</div>';
-  x += '<div class="fm">' + h3('Drop') + pck('drop.on', 'Show drop', 'w4') + pin('drop.label', 'Label', '', 'w2') + pin('drop.h', 'Headline', '', 'w2') + pin('drop.p', 'Desc', 'ta', 'w4') + pin('drop.at', 'Release (GMT+7) datetime-local', 'datetime-local', 'w2') + pin('drop.b', 'Button') + pin('drop.l', 'Link') + '</div>';
-  x += '<div class="fm">' + h3('Newsletter') + pin('news.h', 'Headline', '', 'w2') + pin('news.p', 'Text', '', 'w2') + '</div>';
-  x += '<div class="fm">' + h3('Discount codes') + [0, 1, 2].map(function (i) { return pin('codes.' + i + '.c', 'Code') + psel('codes.' + i + '.t', 'Type', [['pct', 'Percent'], ['fixed', 'Fixed THB'], ['ship', 'Free ship']]) + pin('codes.' + i + '.v', 'Value', 'number') + '<span></span>'; }).join('') + '</div>';
-  x += '<div class="fm">' + h3('Shipping') + pin('ship.rate', 'Flat rate', 'number', 'w2') + pin('ship.free', 'Free above', 'number', 'w2') + '</div>';
-  return '<div class="top"><h1>Sections</h1><button class="btn p" onclick="psave()">Save sections</button></div>' + x;
+  x += '<div class="fm">' + h3(t('เปิด/ปิดส่วน', 'Show/hide')) + [['cats', t('คอลเลกชัน', 'Collection')], ['brand', t('แบรนด์', 'Brand')], ['featured', t('แนะนำ', 'Featured')], ['stories', t('สตอรี', 'Stories')], ['drop', 'Drop'], ['news', t('ข่าวสาร', 'Newsletter')]].map(function (a) { return pck('show.' + a[0], a[1]); }).join('') + '</div>';
+  x += '<div class="fm">' + h3(t('การ์ดคอลเลกชัน', 'Collection cards')) + [0, 1, 2, 3].map(function (i) { return pin('cats.' + i + '.t', t('การ์ด ', 'Card ') + (i + 1), '', 'w2') + pin('cats.' + i + '.l', t('ลิงก์', 'Link'), '', 'w2'); }).join('') + '</div>';
+  x += '<div class="fm">' + h3(t('แบรนด์', 'Brand')) + pin('brand.h', t('หัวข้อ', 'Headline'), '', 'w4') + pin('brand.p', t('เนื้อความ', 'Paragraph'), 'ta', 'w4') + '</div>';
+  x += '<div class="fm">' + h3(t('สตอรี', 'Stories')) + [0, 1, 2, 3, 4].map(function (i) { return pin('stories.' + i + '.k', t('ป้าย', 'Label')) + pin('stories.' + i + '.t', t('หัวข้อ', 'Title'), '', 'w2') + pin('stories.' + i + '.l', t('ลิงก์', 'Link')); }).join('') + '</div>';
+  x += '<div class="fm">' + h3('Drop') + pck('drop.on', t('โชว์ดรอป', 'Show drop'), 'w4') + pin('drop.label', t('ป้าย', 'Label'), '', 'w2') + pin('drop.h', t('หัวข้อ', 'Headline'), '', 'w2') + pin('drop.p', t('คำอธิบาย', 'Desc'), 'ta', 'w4') + pin('drop.at', t('วันวางขาย', 'Release'), 'datetime-local', 'w2') + pin('drop.b', t('ปุ่ม', 'Button')) + pin('drop.l', t('ลิงก์', 'Link')) + '</div>';
+  x += '<div class="fm">' + h3(t('ข่าวสาร', 'Newsletter')) + pin('news.h', t('หัวข้อ', 'Headline'), '', 'w2') + pin('news.p', t('ข้อความ', 'Text'), '', 'w2') + '</div>';
+  x += '<div class="fm">' + h3(t('โค้ดส่วนลด', 'Discount codes')) + [0, 1, 2].map(function (i) { return pin('codes.' + i + '.c', t('โค้ด', 'Code')) + psel('codes.' + i + '.t', t('ประเภท', 'Type'), [['pct', t('เปอร์เซ็นต์', 'Percent')], ['fixed', t('บาท', 'Fixed THB')], ['ship', t('ส่งฟรี', 'Free ship')]]) + pin('codes.' + i + '.v', t('มูลค่า', 'Value'), 'number') + '<span></span>'; }).join('') + '</div>';
+  x += '<div class="fm">' + h3(t('จัดส่ง', 'Shipping')) + pin('ship.rate', t('ค่าส่ง', 'Flat rate'), 'number', 'w2') + pin('ship.free', t('ฟรีเมื่อเกิน', 'Free above'), 'number', 'w2') + '</div>';
+  return '<div class="top"><h1>' + t('ส่วนต่างๆ', 'Sections') + '</h1><button class="btn p" onclick="psave()">' + t('บันทึก', 'Save sections') + '</button></div>' + x;
 }
-async function psave() { if (!isOwner()) { T('แก้ sections ได้เฉพาะ owner'); return; } PG = JSON.parse(JSON.stringify(PGS)); try { localStorage.setItem('jg_page', JSON.stringify(PG)); } catch (e) {} await dbSavePage(); T('Sections saved'); }
+async function psave() { if (!isOwner()) { T('แก้ sections ได้เฉพาะ owner'); return; } PG = JSON.parse(JSON.stringify(PGS)); try { localStorage.setItem('jg_page', JSON.stringify(PG)); } catch (e) {} await dbSavePage(); T(t('บันทึกแล้ว', 'Sections saved')); }
 
 /* ---------- admin: orders / customers / dashboard ---------- */
 function adminOrd() {
   var L = Object.keys(ORDS).map(function (k) { return ORDS[k]; }).sort(function (a, b) { return a.at < b.at ? 1 : -1; });
-  var h = '<div class="top"><h1>Orders</h1><span class="sm">' + L.length + ' orders' + (sb() ? ' · Supabase' : ' · local') + '</span></div>';
-  if (!L.length) return h + '<p>No orders yet.</p>';
-  h += '<div class="sc"><table class="tb"><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th></tr>';
+  var h = '<div class="top"><h1>' + t('คำสั่งซื้อ', 'Orders') + '</h1><span class="sm">' + L.length + ' ' + t('ออเดอร์', 'orders') + (sb() ? ' · Supabase' : ' · local') + '</span></div>';
+  if (!L.length) return h + '<p>' + t('ยังไม่มีออเดอร์', 'No orders yet.') + '</p>';
+  h += '<div class="sc"><table class="tb"><tr><th>' + t('ออเดอร์', 'Order') + '</th><th>' + t('วันที่', 'Date') + '</th><th>' + t('ลูกค้า', 'Customer') + '</th><th>' + t('ชิ้น', 'Items') + '</th><th>' + t('ยอด', 'Total') + '</th><th>' + t('จ่าย', 'Payment') + '</th><th>' + t('สถานะ', 'Status') + '</th></tr>';
   L.forEach(function (o) {
     var q = o.items.reduce(function (a, l) { return a + l.qty; }, 0), open = OO == o.no;
     h += '<tr style="cursor:pointer" onclick="OO=OO==\'' + o.no + '\'?\'\':\'' + o.no + '\';go()"><td>' + esc(o.no) + '</td><td>' + new Date(o.at).toLocaleDateString('en-GB') + '</td><td>' + esc(o.cust.name) + '</td><td>' + q + '</td><td>' + bt(o.total) + '</td><td>' + esc(o.pay) + '</td><td style="text-align:right"><span class="bd">' + o.status + '</span></td></tr>';
-    if (open) h += '<tr><td colspan="7" style="text-align:left"><div class="fm" style="margin:0;border:0"><div class="w2"><b>Customer</b><br>' + esc(o.cust.name) + '<br>' + esc(o.cust.email) + '<br>' + esc(o.cust.phone) + '</div><div class="w2"><b>Ship to</b><br>' + esc(o.addr.line) + '<br>' + esc(o.addr.sub) + ', ' + esc(o.addr.dist) + '<br>' + esc(o.addr.prov) + ' ' + esc(o.addr.zip) + '</div><div class="w4">' + o.items.map(function (l) { return esc(l.name) + ' — ' + esc(l.c) + ' / ' + esc(l.s) + ' × ' + l.qty; }).join('<br>') + '<br><br><b>Total ' + bt(o.total) + '</b></div>' +
-      '<label>Status<select onchange="ost(\'' + o.no + '\',this.value)">' + STS.map(function (x) { return '<option' + (o.status == x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label><label class="w2">Tracking<input value="' + esc(o.track) + '" onchange="oset(\'' + o.no + '\',\'track\',this.value)"></label><label class="w4">Note<textarea onchange="oset(\'' + o.no + '\',\'note\',this.value)">' + esc(o.note) + '</textarea></label></div></td></tr>';
+    if (open) h += '<tr><td colspan="7" style="text-align:left"><div class="fm" style="margin:0;border:0"><div class="w2"><b>' + t('ลูกค้า', 'Customer') + '</b><br>' + esc(o.cust.name) + '<br>' + esc(o.cust.email) + '<br>' + esc(o.cust.phone) + '</div><div class="w2"><b>' + t('ส่งไปที่', 'Ship to') + '</b><br>' + esc(o.addr.line) + '<br>' + esc(o.addr.sub) + ', ' + esc(o.addr.dist) + '<br>' + esc(o.addr.prov) + ' ' + esc(o.addr.zip) + '</div><div class="w4">' + o.items.map(function (l) { return esc(l.name) + ' — ' + esc(l.c) + ' / ' + esc(l.s) + ' × ' + l.qty; }).join('<br>') + '<br><br><b>' + t('ยอดรวม ', 'Total ') + bt(o.total) + '</b></div>' +
+      '<label>' + t('สถานะ', 'Status') + '<select onchange="ost(\'' + o.no + '\',this.value)">' + STS.map(function (x) { return '<option' + (o.status == x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label><label class="w2">Tracking<input value="' + esc(o.track) + '" onchange="oset(\'' + o.no + '\',\'track\',this.value)"></label><label class="w4">' + t('โน้ต', 'Note') + '<textarea onchange="oset(\'' + o.no + '\',\'note\',this.value)">' + esc(o.note) + '</textarea></label></div></td></tr>';
   });
-  return h + '</table></div><p class="sm">Stock ตัดเมื่อ mark paid</p>';
+  return h + '</table></div><p class="sm">' + t('สต็อกตัดเมื่อ mark paid', 'Stock is deducted when marked paid') + '</p>';
 }
 async function ost(no, v) {
   if (!isStaff()) { T('ต้อง login เป็น staff'); return; }
@@ -420,22 +424,22 @@ async function ost(no, v) {
   await dbUpdateOrder(no, { status: v, tracking: o.track, note: o.note, log: o.log, stock_deducted: o.stockDone ? 1 : 0 });
   go();
 }
-async function oset(no, k, v) { if (!isStaff()) { T('ต้อง login เป็น staff'); return; } ORDS[no][k] = v; try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {} var patch = {}; patch[k == 'track' ? 'tracking' : k] = v; await dbUpdateOrder(no, patch); T('Saved'); }
+async function oset(no, k, v) { if (!isStaff()) { T('ต้อง login เป็น staff'); return; } ORDS[no][k] = v; try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {} var patch = {}; patch[k == 'track' ? 'tracking' : k] = v; await dbUpdateOrder(no, patch); T(t('บันทึกแล้ว', 'Saved')); }
 
 /* ---------- admin shell ---------- */
 function jtNav(active) {
-  var store = [['Home', '#/'], ['Shop', '#/shop'], ['Product', '#/product'], ['Cart', '#/cart'], ['Checkout', '#/checkout'], ['Order Complete', '#/order-complete']];
-  if (SB_USER) store.push(['My Orders', '#/account/orders']);
-  var groups = [['STORE', store]];
-  if (isStaff()) groups.push(['ADMIN', [['Dashboard', '#/admin/dashboard'], ['Products', '#/admin/products'], ['Inventory', '#/admin/inventory'], ['Orders', '#/admin/orders'], ['Customers', '#/admin/customers']]]);
+  var store = [[t('หน้าแรก', 'Home'), '#/'], [t('ร้านค้า', 'Shop'), '#/shop'], [t('สินค้า', 'Product'), '#/product'], [t('ตะกร้า', 'Cart'), '#/cart'], [t('ชำระเงิน', 'Checkout'), '#/checkout'], [t('สำเร็จ', 'Order Complete'), '#/order-complete']];
+  if (SB_USER) store.push([t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders']);
+  var groups = [[t('ร้าน', 'STORE'), store]];
+  if (isStaff()) groups.push([t('จัดการร้าน', 'ADMIN'), [[t('แดชบอร์ด', 'Dashboard'), '#/admin/dashboard'], [t('สินค้า', 'Products'), '#/admin/products'], [t('สต็อก', 'Inventory'), '#/admin/inventory'], [t('คำสั่งซื้อ', 'Orders'), '#/admin/orders'], [t('ลูกค้า', 'Customers'), '#/admin/customers']]]);
   if (isOwner()) {
-    groups.push(['WEBSITE', [['Homepage', '#/admin/website/homepage'], ['Sections', '#/admin/website/sections']]]);
-    groups.push(['SETTINGS', [['General', '#/admin/settings/general'], ['Shipping', '#/admin/settings/shipping'], ['Payment', '#/admin/settings/payment'], ['Contact', '#/admin/settings/contact'], ['SEO', '#/admin/settings/seo'], ['Maintenance', '#/admin/settings/maintenance']]]);
+    groups.push([t('เว็บ', 'WEBSITE'), [[t('หน้าแรก', 'Homepage'), '#/admin/website/homepage'], [t('ส่วนต่างๆ', 'Sections'), '#/admin/website/sections']]]);
+    groups.push([t('ตั้งค่า', 'SETTINGS'), [[t('ทั่วไป', 'General'), '#/admin/settings/general'], [t('จัดส่ง', 'Shipping'), '#/admin/settings/shipping'], [t('จ่ายเงิน', 'Payment'), '#/admin/settings/payment'], [t('ติดต่อ', 'Contact'), '#/admin/settings/contact'], ['SEO', '#/admin/settings/seo'], [t('ปิดปรับปรุง', 'Maintenance'), '#/admin/settings/maintenance']]]);
   }
-  var sys = [['Supabase', '#/admin/system/supabase']];
-  if (isStaff()) sys.push(['Staff & Roles', '#/admin/system/staff']);
-  if (isOwner()) sys.push(['Activity Log', '#/admin/system/activity']);
-  groups.push(['SYSTEM', sys]);
+  var sys = [[t('เชื่อมต่อ', 'Supabase'), '#/admin/system/supabase']];
+  if (isStaff()) sys.push([t('ทีมงาน', 'Staff & Roles'), '#/admin/system/staff']);
+  if (isOwner()) sys.push([t('บันทึกกิจกรรม', 'Activity Log'), '#/admin/system/activity']);
+  groups.push([t('ระบบ', 'SYSTEM'), sys]);
   var sts = isStaff() ? '<div class="jgt-muted">' + (sb() ? '● Supabase · ' + esc(roleLabel()) : '○ local · owner') + '</div>' : '';
   var h = '<aside class="jt-side"><div class="jt-brand"><a href="#/" style="font-weight:800">JUNGRAI TACT</a>' + sts + '</div>';
   groups.forEach(function (g) { h += '<div class="jt-group">' + g[0] + '</div>'; g[1].forEach(function (x) { h += '<a href="' + x[1] + '" class="' + (active === x[1] ? 'active' : '') + '">' + x[0] + '</a>'; }); });
@@ -445,53 +449,53 @@ function jtShell(title, active, body) { return '<div class="jt-admin"><div>' + j
 function jtSettings(section) {
   var c = JSON.parse(localStorage.getItem('jt_settings') || '{}'), defaults = { name: 'JUNGRAI TACT', currency: 'THB', ship: 60, free: 2000, promptpay: false, card: false, bank: false, email: '', phone: '', address: '', title: 'JUNGRAI TACT', desc: '', maint: false, msg: 'Maintenance.' };
   c = Object.assign(defaults, c);
-  var label = { general: 'General', shipping: 'Shipping', payment: 'Payment', contact: 'Contact', seo: 'SEO', maintenance: 'Maintenance' }[section] || section, fields = '';
-  if (section === 'general') fields = '<label>Store name<input id="jt_name" value="' + esc(c.name) + '"></label><label>Currency<select id="jt_currency"><option ' + (c.currency === 'THB' ? 'selected' : '') + '>THB</option><option ' + (c.currency === 'USD' ? 'selected' : '') + '>USD</option></select></label>';
-  if (section === 'shipping') fields = '<label>Shipping<input id="jt_ship" type="number" value="' + Number(c.ship || 0) + '"></label><label>Free threshold<input id="jt_free" type="number" value="' + Number(c.free || 0) + '"></label>';
+  var label = { general: t('ทั่วไป', 'General'), shipping: t('จัดส่ง', 'Shipping'), payment: t('จ่ายเงิน', 'Payment'), contact: t('ติดต่อ', 'Contact'), seo: 'SEO', maintenance: t('ปิดปรับปรุง', 'Maintenance') }[section] || section, fields = '';
+  if (section === 'general') fields = '<label>' + t('ชื่อร้าน', 'Store name') + '<input id="jt_name" value="' + esc(c.name) + '"></label><label>' + t('สกุลเงิน', 'Currency') + '<select id="jt_currency"><option ' + (c.currency === 'THB' ? 'selected' : '') + '>THB</option><option ' + (c.currency === 'USD' ? 'selected' : '') + '>USD</option></select></label>';
+  if (section === 'shipping') fields = '<label>' + t('ค่าส่ง', 'Shipping') + '<input id="jt_ship" type="number" value="' + Number(c.ship || 0) + '"></label><label>' + t('ฟรีเมื่อเกิน', 'Free threshold') + '<input id="jt_free" type="number" value="' + Number(c.free || 0) + '"></label>';
   if (section === 'payment') fields = '<label><input id="jt_prompt" type="checkbox" ' + (c.promptpay ? 'checked' : '') + '> PromptPay</label><label><input id="jt_card" type="checkbox" ' + (c.card ? 'checked' : '') + '> Card</label><label><input id="jt_bank" type="checkbox" ' + (c.bank ? 'checked' : '') + '> Bank</label>';
-  if (section === 'contact') fields = '<label>Email<input id="jt_email" value="' + esc(c.email) + '"></label><label>Phone<input id="jt_phone" value="' + esc(c.phone) + '"></label><label class="full">Address<textarea id="jt_address">' + esc(c.address) + '</textarea></label>';
+  if (section === 'contact') fields = '<label>Email<input id="jt_email" value="' + esc(c.email) + '"></label><label>' + t('โทร', 'Phone') + '<input id="jt_phone" value="' + esc(c.phone) + '"></label><label class="full">' + t('ที่อยู่', 'Address') + '<textarea id="jt_address">' + esc(c.address) + '</textarea></label>';
   if (section === 'seo') fields = '<label class="full">Title<input id="jt_title" value="' + esc(c.title) + '"></label><label class="full">Desc<textarea id="jt_desc">' + esc(c.desc) + '</textarea></label>';
   if (section === 'maintenance') fields = '<label><input id="jt_maint" type="checkbox" ' + (c.maint ? 'checked' : '') + '> Maintenance</label><label class="full">Message<textarea id="jt_msg">' + esc(c.msg) + '</textarea></label>';
-  return jtShell(label, '#/admin/settings/' + section, '<div class="jt-panel"><div class="jt-form">' + fields + '</div><button class="btn p" onclick="jtSaveSettings(\'' + section + '\')">Save</button></div>');
+  return jtShell(label, '#/admin/settings/' + section, '<div class="jt-panel"><div class="jt-form">' + fields + '</div><button class="btn p" onclick="jtSaveSettings(\'' + section + '\')">' + t('บันทึก', 'Save') + '</button></div>');
 }
 window.jtSaveSettings = function (section) {
   var c = JSON.parse(localStorage.getItem('jt_settings') || '{}'), v = function (id) { var x = document.getElementById(id); return x ? x.value : ''; }, b = function (id) { var x = document.getElementById(id); return !!(x && x.checked); };
   if (section === 'general') { c.name = v('jt_name'); c.currency = v('jt_currency'); } else if (section === 'shipping') { c.ship = Number(v('jt_ship') || 0); c.free = Number(v('jt_free') || 0); } else if (section === 'payment') { c.promptpay = b('jt_prompt'); c.card = b('jt_card'); c.bank = b('jt_bank'); } else if (section === 'contact') { c.email = v('jt_email'); c.phone = v('jt_phone'); c.address = v('jt_address'); } else if (section === 'seo') { c.title = v('jt_title'); c.desc = v('jt_desc'); } else if (section === 'maintenance') { c.maint = b('jt_maint'); c.msg = v('jt_msg'); }
-  localStorage.setItem('jt_settings', JSON.stringify(c)); T('Saved'); go();
+  localStorage.setItem('jt_settings', JSON.stringify(c)); T(t('บันทึกแล้ว', 'Saved')); go();
 };
 function jtDashboard() {
   var os = Object.keys(ORDS).map(function (k) { return ORDS[k]; }), sales = os.filter(function (o) { return !['cancelled', 'refunded'].includes(o.status); }).reduce(function (a, o) { return a + Number(o.total || 0); }, 0), pending = os.filter(function (o) { return ['new'].includes(o.status); }).length;
-  return jtShell('Dashboard', '#/admin/dashboard', '<div class="jt-grid"><div class="jt-kpi"><span>Products</span><b>' + P.length + '</b></div><div class="jt-kpi"><span>Orders</span><b>' + os.length + '</b></div><div class="jt-kpi"><span>Sales</span><b>' + bt(sales) + '</b></div><div class="jt-kpi"><span>Role</span><b style="font-size:20px">' + esc(roleLabel()) + '</b></div></div><div class="jt-panel"><span class="jgt-kpi">Mode</span><p>' + (sb() ? 'Supabase live: ' + esc(SB.url) + ' · ' + esc(SB_USER ? SB_USER.email : 'guest') : 'Local mode — ตั้งค่า Supabase ที่ SYSTEM › Supabase') + '</p></div>');
+  return jtShell(t('แดชบอร์ด', 'Dashboard'), '#/admin/dashboard', '<div class="jt-grid"><div class="jt-kpi"><span>' + t('สินค้า', 'Products') + '</span><b>' + P.length + '</b></div><div class="jt-kpi"><span>' + t('ออเดอร์', 'Orders') + '</span><b>' + os.length + '</b></div><div class="jt-kpi"><span>' + t('ยอดขาย', 'Sales') + '</span><b>' + bt(sales) + '</b></div><div class="jt-kpi"><span>' + t('บทบาท', 'Role') + '</span><b style="font-size:20px">' + esc(roleLabel()) + '</b></div></div><div class="jt-panel"><span class="jgt-kpi">Mode</span><p>' + (sb() ? 'Supabase live: ' + esc(SB.url) + ' · ' + esc(SB_USER ? SB_USER.email : 'guest') : t('Local mode — ตั้งค่า Supabase ที่ SYSTEM › Supabase', 'Local mode — connect Supabase under SYSTEM › Supabase')) + '</p></div>');
 }
-function jtInventory() { return jtShell('Inventory', '#/admin/inventory', '<div class="jt-panel"><table class="tb"><tr><th>Product</th><th>SKU</th><th>Stock</th><th>Status</th></tr>' + P.map(function (p) { var n2 = Number(p.stock || 0); return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.sku) + '</td><td>' + n2 + '</td><td>' + (n2 <= 0 ? 'OUT' : n2 <= Number(p.low || 5) ? 'LOW' : 'IN') + '</td></tr>'; }).join('') + '</table></div>'); }
+function jtInventory() { return jtShell(t('สต็อก', 'Inventory'), '#/admin/inventory', '<div class="jt-panel"><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>SKU</th><th>' + t('สต็อก', 'Stock') + '</th><th>' + t('สถานะ', 'Status') + '</th></tr>' + P.map(function (p) { var n2 = Number(p.stock || 0); return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.sku) + '</td><td>' + n2 + '</td><td>' + (n2 <= 0 ? t('หมด', 'OUT') : n2 <= Number(p.low || 5) ? t('น้อย', 'LOW') : t('ปกติ', 'IN')) + '</td></tr>'; }).join('') + '</table></div>'); }
 function jtCustomers() {
   var map = {}; Object.keys(ORDS).forEach(function (k) { var o = ORDS[k], c = o.cust || {}; var key = String(c.email || 'guest:' + o.no).toLowerCase(); if (!map[key]) map[key] = { name: c.name || 'Guest', email: c.email || '', phone: c.phone || '', orders: 0, total: 0 }; map[key].orders++; map[key].total += Number(o.total || 0); });
-  return jtShell('Customers', '#/admin/customers', '<div class="jt-panel"><table class="tb"><tr><th>Name</th><th>Email</th><th>Phone</th><th>Orders</th><th>Total</th></tr>' + Object.keys(map).map(function (k) { var c = map[k]; return '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.phone) + '</td><td>' + c.orders + '</td><td>' + bt(c.total) + '</td></tr>'; }).join('') + '</table></div>');
+  return jtShell(t('ลูกค้า', 'Customers'), '#/admin/customers', '<div class="jt-panel"><table class="tb"><tr><th>' + t('ชื่อ', 'Name') + '</th><th>Email</th><th>' + t('โทร', 'Phone') + '</th><th>' + t('ออเดอร์', 'Orders') + '</th><th>' + t('ยอดรวม', 'Total') + '</th></tr>' + Object.keys(map).map(function (k) { var c = map[k]; return '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.phone) + '</td><td>' + c.orders + '</td><td>' + bt(c.total) + '</td></tr>'; }).join('') + '</table></div>');
 }
 function jtStaff() {
   var rows = SB_PROFILES.map(function (u) { return '<tr><td>' + esc(u.email) + '</td><td><span class="bd">' + esc(u.role) + '</span></td><td style="text-align:right">' + (isOwner() && SB_USER && u.id !== SB_USER.id ? '<select onchange="sbSetRole(\'' + u.id + '\',this.value)">' + ['member', 'shop_admin', 'owner'].map(function (r) { return '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select>' : '<span class="sm">you</span>') + '</td></tr>'; }).join('');
-  return jtShell('Staff & Roles', '#/admin/system/staff', '<div class="jt-panel"><p class="sm">Owner ทำได้ทุกอย่าง · Shop admin เติมสต็อก+จัดการออเดอร์ (แก้ราคา/ลบ/แก้เว็บไม่ได้) · Member ดูออเดอร์ตัวเอง · Guest สั่งซื้อได้อย่างเดียว</p><div style="margin:12px 0"><button class="btn s" onclick="sbLoadProfiles()">Reload users</button></div><table class="tb"><tr><th>Email</th><th>Role</th><th></th></tr>' + (rows || '<tr><td colspan="3">ยังไม่มีข้อมูล — กด Reload (ต้องรัน migration_roles.sql + login เป็น owner)</td></tr>') + '</table><p class="jgt-muted">เปลี่ยน role ได้เฉพาะ owner · user ใหม่สมัครมาจะเป็น member อัตโนมัติ · ตั้ง owner คนแรกด้วย SQL: update profiles set role=\'owner\' where email=\'...\'</p></div>');
+  return jtShell(t('ทีมงาน', 'Staff & Roles'), '#/admin/system/staff', '<div class="jt-panel"><p class="sm">' + t('Owner ทำได้ทุกอย่าง · Shop admin เติมสต็อก+จัดการออเดอร์ · Member ดูออเดอร์ตัวเอง · Guest สั่งซื้อได้อย่างเดียว', 'Owner: everything · Shop admin: stock + orders · Member: own orders · Guest: order only') + '</p><div style="margin:12px 0"><button class="btn s" onclick="sbLoadProfiles()">' + t('โหลดรายชื่อ', 'Reload users') + '</button></div><table class="tb"><tr><th>Email</th><th>' + t('บทบาท', 'Role') + '</th><th></th></tr>' + (rows || '<tr><td colspan="3">' + t('ยังไม่มีข้อมูล — กด Reload', 'No data — press Reload') + '</td></tr>') + '</table><p class="jgt-muted">' + t('เปลี่ยน role ได้เฉพาะ owner · ตั้ง owner คนแรกด้วย SQL: update profiles set role=\'owner\' where email=\'...\'', 'Only owner can change roles · set first owner via SQL') + '</p></div>');
 }
 window.sbSetRole = async function (id, role) {
   if (!isOwner()) { T('เปลี่ยน role ได้เฉพาะ owner'); return; }
   var c = sb(); var r = await c.from('profiles').update({ role: role }).eq('id', id);
-  if (r.error) T(r.error.message); else { T('Updated to ' + role); sbLoadProfiles(); }
+  if (r.error) T(r.error.message); else { T(t('เปลี่ยนเป็น ', 'Updated to ') + role); sbLoadProfiles(); }
 };
 window.sbLoadProfiles = async function () {
   var c = sb(); if (!c || !isStaff()) { T('ต้อง login เป็น staff'); return; }
   var r = await c.from('profiles').select('id,email,role').order('created_at');
-  if (!r.error && r.data) { SB_PROFILES = r.data; go(); } else T((r.error && r.error.message) || 'load failed');
+  if (!r.error && r.data) { SB_PROFILES = r.data; go(); } else T((r.error && r.error.message) || t('โหลดไม่สำเร็จ', 'load failed'));
 };
-function jtActivity() { return jtShell('Activity Log', '#/admin/system/activity', '<div class="jt-panel"><p>ต้องมี backend จริง — ตอนนี้ดู log ใน Supabase › Table Editor › activity_log</p></div>'); }
+function jtActivity() { return jtShell(t('บันทึกกิจกรรม', 'Activity Log'), '#/admin/system/activity', '<div class="jt-panel"><p>' + t('ดู log ใน Supabase › Table Editor › activity_log', 'See logs in Supabase › Table Editor › activity_log') + '</p></div>'); }
 function jtSupabase() {
   var ls = {}; try { ls = JSON.parse(localStorage.getItem('jt_supabase') || '{}'); } catch (e) {}
   // ยังไม่ต่อ: หน้า setup (เห็นเฉพาะตอน local mode)
   if (!sb()) return jtShell('Supabase', '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Supabase URL<input id="sb_url" value="' + esc(ls.url || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_URL) || '')) + '" placeholder="https://xyz.supabase.co"></label><label class="full">Anon key (public — ปลอดภัยที่จะอยู่ในเว็บ)<input id="sb_key" value="' + esc(ls.key || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || '')) + '" placeholder="eyJ..."></label></div><div style="margin-top:12px"><button class="btn p" onclick="sbSave()">Save & connect</button></div><p class="jgt-muted" style="margin-top:12px">รัน supabase/schema.sql + seed.sql + migration_roles.sql ก่อน แล้วค่อย Save & connect</p></div>');
   // ต่อแล้วแต่ยังไม่ login: ฟอร์ม email+password เข้าเลย (magic link เป็นทางเลือก)
-  if (!SB_USER) return jtShell('Login', '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Email<input id="sb_email" type="email" placeholder="owner@jungrai.com" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label><label class="full">Password<input id="sb_pass" type="password" placeholder="รหัสผ่าน" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbLoginPass()">Login</button><button class="btn" onclick="sbLogin()">Send magic link แทน</button></div><p class="jgt-muted" style="margin-top:12px">กรอก email + password ที่ owner สร้างให้ใน Supabase Dashboard → Authentication แล้วเข้าได้เลย ไม่ต้องวนผ่านอีเมล · ลืมรหัสให้ owner กด Reset password ใน Dashboard</p></div>');
+  if (!SB_USER) return jtShell(t('เข้าสู่ระบบ', 'Login'), '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Email<input id="sb_email" type="email" placeholder="owner@jungrai.com" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label><label class="full">' + t('รหัสผ่าน', 'Password') + '<input id="sb_pass" type="password" placeholder="' + t('รหัสผ่าน', 'Password') + '" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbLoginPass()">Login</button><button class="btn" onclick="sbLogin()">' + t('ส่ง magic link แทน', 'Send magic link instead') + '</button></div><p class="jgt-muted" style="margin-top:12px">' + t('กรอก email + password ที่ owner สร้างให้ แล้วเข้าได้เลย', 'Enter the email + password from your owner to log in directly') + '</p></div>');
   // login แล้ว: สถานะ + logout, ช่อง URL/key เห็น/แก้ได้เฉพาะ owner
   var conn = isOwner() ? '<div class="jt-form" style="margin-top:12px"><label class="full">Supabase URL<input id="sb_url" value="' + esc(SB.url) + '"></label><label class="full">Anon key<input id="sb_key" value="' + esc((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || ls.key || '') + '"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbSave()">Save & connect</button><button class="btn d" onclick="SBClear()">Disconnect</button></div>' : '';
-  return jtShell('Account', '#/admin/system/supabase', '<div class="jt-panel"><p>Login: <b>' + esc(SB_USER.email) + '</b> · <span class="bd">' + esc(roleLabel()) + '</span></p><div style="margin-top:12px"><button class="btn" onclick="sbLogout()">Logout</button></div>' + conn + '</div>');
+  return jtShell(t('บัญชี', 'Account'), '#/admin/system/supabase', '<div class="jt-panel"><p>Login: <b>' + esc(SB_USER.email) + '</b> · <span class="bd">' + esc(roleLabel()) + '</span></p><div style="margin-top:12px"><button class="btn" onclick="sbLogout()">Logout</button></div>' + conn + '</div>');
 }
 window.sbSave = function () { var u = document.getElementById('sb_url').value.trim(), k = document.getElementById('sb_key').value.trim(); if (!u || !k) { T('กรอก URL + key'); return; } SB.saveConn(u, k); };
 window.SBClear = function () { SB.clearConn(); };
@@ -523,7 +527,7 @@ function handleAuthRedirect() {
   else if (desc) T(desc);
   try { history.replaceState(null, '', location.pathname + '#/admin/system/supabase'); } catch (e) { location.hash = '#/admin/system/supabase'; }
 }
-window.sbLogout = async function () { var c = sb(); if (c) await c.auth.signOut(); SB_USER = null; SB_ROLE = 'guest'; SB_PROFILES = []; T('Logged out'); go(); };
+window.sbLogout = async function () { var c = sb(); if (c) await c.auth.signOut(); SB_USER = null; SB_ROLE = 'guest'; SB_PROFILES = []; T(t('ออกจากระบบแล้ว', 'Logged out')); go(); };
 
 /* ---------- misc views ---------- */
 function tcur() { CUR = CUR == 'THB' ? 'USD' : 'THB'; try { localStorage.setItem('jg_cur', CUR); } catch (e) {} go(); }
@@ -532,12 +536,12 @@ function hc() { var m = (location.hash || '').match(/^#\/shop\?cat=(.+)$/); if (
 
 /* ---------- account: my orders (member) ---------- */
 function myOrdersView() {
-  if (!SB_USER) return jtShell('My Orders', '#/account/orders', '<div class="jt-panel"><p>Login ก่อนเพื่อดูออเดอร์ของตัวเอง</p><a class="btn p" href="#/admin/system/supabase">Login</a></div>');
+  if (!SB_USER) return jtShell(t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders', '<div class="jt-panel"><p>' + t('Login ก่อนเพื่อดูออเดอร์ของตัวเอง', 'Log in to see your orders') + '</p><a class="btn p" href="#/admin/system/supabase">Login</a></div>');
   var L = Object.keys(ORDS).map(function (k) { return ORDS[k]; }).sort(function (a, b) { return a.at < b.at ? 1 : -1; });
-  if (!L.length) return jtShell('My Orders', '#/account/orders', '<div class="jt-panel"><p>ยังไม่มีออเดอร์</p><a class="btn p" href="#/shop">Shop now</a></div>');
-  return jtShell('My Orders', '#/account/orders', '<div class="jt-panel"><table class="tb"><tr><th>Order</th><th>Date</th><th>Total</th><th>Status</th></tr>' + L.map(function (o) { return '<tr><td>' + esc(o.no) + '</td><td>' + new Date(o.at).toLocaleDateString('en-GB') + '</td><td>' + bt(o.total) + '</td><td>' + esc(o.status) + '</td></tr>'; }).join('') + '</table></div>');
+  if (!L.length) return jtShell(t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders', '<div class="jt-panel"><p>' + t('ยังไม่มีออเดอร์', 'No orders yet') + '</p><a class="btn p" href="#/shop">' + t('ช้อปเลย', 'Shop now') + '</a></div>');
+  return jtShell(t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders', '<div class="jt-panel"><table class="tb"><tr><th>' + t('ออเดอร์', 'Order') + '</th><th>' + t('วันที่', 'Date') + '</th><th>' + t('ยอด', 'Total') + '</th><th>' + t('สถานะ', 'Status') + '</th></tr>' + L.map(function (o) { return '<tr><td>' + esc(o.no) + '</td><td>' + new Date(o.at).toLocaleDateString('en-GB') + '</td><td>' + bt(o.total) + '</td><td>' + esc(o.status) + '</td></tr>'; }).join('') + '</table></div>');
 }
-function deny(page) { return jtShell(page, location.hash, '<div class="jt-panel"><p>สิทธิ์ไม่ถึง (' + esc(roleLabel()) + ') — หน้านี้ต้องเป็น ' + esc(page === 'Owner only' ? 'owner' : 'staff') + '</p><a class="btn p" href="#/admin/system/supabase">Login / เปลี่ยน user</a></div>'); }
+function deny(page) { var needOwner = page === 'Owner only'; return jtShell(needOwner ? t('เฉพาะ owner', 'Owner only') : t('เฉพาะทีมงาน', 'Staff only'), location.hash, '<div class="jt-panel"><p>' + t('สิทธิ์ไม่ถึง', 'No permission') + ' (' + esc(roleLabel()) + ')</p><a class="btn p" href="#/admin/system/supabase">Login / ' + t('เปลี่ยน user', 'switch user') + '</a></div>'); }
 
 /* ---------- router ---------- */
 function go() {
@@ -557,7 +561,7 @@ function go() {
   else if (h === '#/admin/system/supabase') v = jtSupabase();
   else if (h === '#/admin/system/staff') v = isStaff() ? jtStaff() : deny('Staff only');
   else if (h === '#/admin/system/activity') v = isOwner() ? jtActivity() : deny('Owner only');
-  else if (h === '#/product') v = jtShell('Product', '#/product', '<div class="jt-panel"><p>เลือกสินค้าจาก Shop</p><a class="btn p" href="#/shop">Go to Shop</a></div>');
+  else if (h === '#/product') v = jtShell(t('สินค้า', 'Product'), '#/product', '<div class="jt-panel"><p>' + t('เลือกสินค้าจาก Shop', 'Pick a product from Shop') + '</p><a class="btn p" href="#/shop">' + t('ไปดูสินค้า', 'Go to Shop') + '</a></div>');
   else if (h === '#/order-complete' || m2) { var no = m2 ? decodeURIComponent(m2[1]) : null; v = no ? doneView(no) : jtShell('Order Complete', '#/order-complete', '<div class="jt-panel"><p>Done</p></div>'); }
   else if (m) v = prod(decodeURIComponent(m[1]));
   else if (h.indexOf('#/cart') === 0) v = cartView();
