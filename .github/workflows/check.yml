@@ -1,0 +1,20 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate required files
+        run: |
+          test -f index.html || (echo "missing index.html" && exit 1)
+          test -f css/style.css || (echo "missing css" && exit 1)
+          test -f js/app.js || (echo "missing app.js" && exit 1)
+          test -f supabase/schema.sql || (echo "missing schema.sql" && exit 1)
+          test -f vercel.json || (echo "missing vercel.json" && exit 1)
+          echo "OK - ready for Vercel / Netlify"

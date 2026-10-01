@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JUNGRAI TACT — Shop</title>
+<meta name="description" content="JUNGRAI TACT — Tactical apparel & field equipment">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+<header><div class="w"><div class="hb">
+<a class="logo" href="#/"><span>JUNGRAI <i>TACT</i></span></a>
+<nav><a href="#/">HOME</a><a href="#/shop">SHOP</a><a href="#/admin" id="al">ADMIN</a></nav>
+<button id="cur" onclick="tcur()" style="border:1px solid var(--ln);padding:3px 8px">THB</button><a href="#/cart" id="cl">CART (<span id="cc">0</span>)</a></div></div></header>
+<main><div id="app"></div></main>
+<footer><div class="w" style="padding-top:36px"><div class="fg"><div><div class="logo" style="font-size:22px"><span>JUNGRAI <i>TACT</i></span></div><p style="margin-top:12px;max-width:30ch">Built for the field.</p></div><div><div class="sm">Shop</div><a href="#/shop?cat=Apparel">Apparel</a><a href="#/shop?cat=Field%20Gear">Field gear</a><a href="#/shop?cat=Accessories">Accessories</a><a href="#/shop?cat=Patches">Patches</a></div><div><div class="sm">Customer service</div><a href="#/shop">Shipping</a><a href="#/shop">Returns</a><a href="#/shop">Size guide</a><a href="#/shop">Contact</a></div><div><div class="sm">Company</div><a href="#/">About</a><a href="#/">Instagram</a><a href="#/">Facebook</a><a href="#/">Privacy</a><a href="#/">Terms</a></div></div>© 2026 JUNGRAI TACT — Built for the field. <span id="mode" class="sm"></span></div></footer>
+<div id="toast" role="status"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./js/config.js"></script>
+<script src="./js/supabase-client.js"></script>
+<script src="./js/app.js"></script>
+</body>
+</html>
