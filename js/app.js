@@ -721,24 +721,37 @@ function myAddr() {
   return { name: (SB_PROFILE && SB_PROFILE.full_name) || '', phone: (SB_PROFILE && SB_PROFILE.phone) || '', line: a.line || '', sub: a.sub || '', dist: a.dist || '', prov: a.prov || '', zip: a.zip || '' };
 }
 window.sbSaveAddress = async function () {
-  var c = sb(); if (!c || !SB_USER) return;
+  var c = sb(); if (!c) { T(t('ยังไม่ต่อ Supabase', 'Not connected')); return; }
+  if (!SB_USER) { T(t('กรุณา login ก่อน', 'Please log in first')); return; }
   var v = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); };
   var addr = { line: v('ad_ad'), sub: v('ad_sd'), dist: v('ad_ds'), prov: v('ad_pv'), zip: v('ad_zp') };
-  var r = await c.from('profiles').update({ address: addr }).eq('id', SB_USER.id);
-  if (r.error) T(r.error.message);
-  else { if (SB_PROFILE) { SB_PROFILE.address = addr; } T(t('บันทึกที่อยู่แล้ว', 'Address saved')); go(); }
+  try {
+    var r = await c.from('profiles').update({ address: addr }).eq('id', SB_USER.id);
+    if (r.error) throw new Error(r.error.message);
+    if (SB_PROFILE) SB_PROFILE.address = addr;
+    T(t('บันทึกที่อยู่แล้ว', 'Address saved')); go();
+  } catch (e) { T(t('บันทึกไม่สำเร็จ: ', 'Save failed: ') + (e.message || e)); }
 };
 window.sbSaveProfile = async function () {
-  var c = sb(); if (!c || !SB_USER) return;
+  var c = sb(); if (!c) { T(t('ยังไม่ต่อ Supabase', 'Not connected')); return; }
+  if (!SB_USER) { T(t('กรุณา login ก่อน', 'Please log in first')); return; }
   var v = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); };
-  var r = await c.from('profiles').update({ display_name: v('pf_name'), full_name: v('pf_full'), phone: v('pf_ph') }).eq('id', SB_USER.id);
-  if (r.error) T(r.error.message); else { if (SB_PROFILE) { SB_PROFILE.display_name = v('pf_name'); SB_PROFILE.full_name = v('pf_full'); SB_PROFILE.phone = v('pf_ph'); } T(t('บันทึกแล้ว', 'Saved')); go(); }
+  try {
+    var r = await c.from('profiles').update({ display_name: v('pf_name'), full_name: v('pf_full'), phone: v('pf_ph') }).eq('id', SB_USER.id);
+    if (r.error) throw new Error(r.error.message);
+    if (SB_PROFILE) { SB_PROFILE.display_name = v('pf_name'); SB_PROFILE.full_name = v('pf_full'); SB_PROFILE.phone = v('pf_ph'); }
+    T(t('บันทึกแล้ว', 'Saved')); go();
+  } catch (e) { T(t('บันทึกไม่สำเร็จ: ', 'Save failed: ') + (e.message || e)); }
 };
 window.sbChangePass = async function () {
-  var c = sb(); var pw = ((document.getElementById('np_pass') || {}).value || '');
+  var c = sb(); if (!c) { T(t('ยังไม่ต่อ Supabase', 'Not connected')); return; }
+  var pw = ((document.getElementById('np_pass') || {}).value || '');
   if (pw.length < 6) { T(t('รหัสผ่านอย่างน้อย 6 ตัว', 'Password min 6 chars')); return; }
-  var r = await c.auth.updateUser({ password: pw });
-  if (r.error) T(r.error.message); else T(t('เปลี่ยนรหัสผ่านแล้ว', 'Password changed'));
+  try {
+    var r = await c.auth.updateUser({ password: pw });
+    if (r.error) throw new Error(r.error.message);
+    T(t('เปลี่ยนรหัสผ่านแล้ว', 'Password changed'));
+  } catch (e) { T(t('เปลี่ยนไม่สำเร็จ: ', 'Change failed: ') + (e.message || e)); }
 };
 window.sbSave = function () { var u = document.getElementById('sb_url').value.trim(), k = document.getElementById('sb_key').value.trim(); if (!u || !k) { T('กรอก URL + key'); return; } SB.saveConn(u, k); };
 window.SBClear = function () { SB.clearConn(); };
