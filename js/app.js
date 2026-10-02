@@ -100,7 +100,28 @@ function pic(p, i, c) {
   if (u && (/^(https?:|data:image|\.\/|img\/|\/)/.test(u) || /\.(jpg|jpeg|png|webp|svg|gif)(\?.*)?$/i.test(u))) return '<img src="' + u + '" alt="' + esc(p.name) + '" loading="lazy">';
   return art(p, c);
 }
-function gal(p) { var n = (IM[p.id] || []).length || 3, h = ''; for (var i = 0; i < n; i++) h += '<div class="pn">' + pic(p, i, SEL.c) + '</div>'; return '<div class="gl">' + h + '</div>'; }
+function gal(p) {
+  var imgs = IM[p.id] || [], n = imgs.length;
+  if (!n) return '<div class="gl"><div class="pn">' + art(p, SEL.c) + '</div></div>';
+  if (GIDX[p.id] == null || GIDX[p.id] >= n) GIDX[p.id] = 0;
+  var i = GIDX[p.id];
+  var dots = imgs.map(function (_, j) { return '<button aria-label="Image ' + (j + 1) + '" class="gs-dot' + (j === i ? ' on' : '') + '" onclick="ggo(\'' + esc(p.id) + '\',' + j + ')"></button>'; }).join('');
+  var ths = imgs.map(function (u, j) { return '<button class="gs-th' + (j === i ? ' on' : '') + '" onclick="ggo(\'' + esc(p.id) + '\',' + j + ')"><img src="' + u + '" alt="" loading="lazy"></button>'; }).join('');
+  return '<div class="gsl"><div class="pn gs-main"><img id="gs-img" src="' + imgs[i] + '" alt="' + esc(p.name) + '"></div>' +
+    (n > 1 ? '<button class="gs-arrow l" aria-label="Prev" onclick="gnav(\'' + esc(p.id) + '\',-1)">‹</button><button class="gs-arrow r" aria-label="Next" onclick="gnav(\'' + esc(p.id) + '\',1)">›</button><div class="gs-dots">' + dots + '</div>' : '') +
+    (n > 1 ? '<div class="gs-ths">' + ths + '</div>' : '') + '</div>';
+}
+var GIDX = {};
+function gpaint(pid) {
+  var imgs = IM[pid] || []; if (!imgs.length) return;
+  var i = ((GIDX[pid] || 0) + imgs.length) % imgs.length; GIDX[pid] = i;
+  var im = document.getElementById('gs-img'); if (im) im.src = imgs[i];
+  var d = document.querySelectorAll('.gs-dot'), th = document.querySelectorAll('.gs-th');
+  d.forEach(function (e, j) { e.classList.toggle('on', j === i); });
+  th.forEach(function (e, j) { e.classList.toggle('on', j === i); });
+}
+function gnav(pid, d) { var n = (IM[pid] || []).length || 1; GIDX[pid] = (((GIDX[pid] || 0) + d) % n + n) % n; gpaint(pid); }
+function ggo(pid, i) { GIDX[pid] = i; gpaint(pid); }
 function list() { return P.filter(function (p) { return p.status == 'active'; }); }
 function gp(id) { return P.filter(function (p) { return p.id == id; })[0]; }
 function cnt() { var n = 0; CART.forEach(function (l) { n += l.qty; }); var e = $('#cc'); if (e) e.textContent = n; }
