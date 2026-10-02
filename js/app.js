@@ -336,15 +336,16 @@ function cartView() {
 }
 function checkoutView() {
   if (!CART.length) return '<div class="top"><h1>' + t('ชำระเงิน', 'Checkout') + '</h1></div><p>' + t('ตะกร้าว่าง', 'Your cart is empty.') + '</p>';
-  function f(id, l, ph, c, t, ac) { return '<label class="' + (c || '') + '">' + l + '<input id="' + id + '" type="' + (t || 'text') + '" placeholder="' + ph + '" autocomplete="' + (ac || 'off') + '"></label>'; }
+  function f(id, l, ph, c, t, ac, v) { return '<label class="' + (c || '') + '">' + l + '<input id="' + id + '" type="' + (t || 'text') + '" placeholder="' + ph + '" value="' + esc(v || '') + '" autocomplete="' + (ac || 'off') + '"></label>'; }
+  var ad0 = (SB_USER ? myAddr() : { name: '', phone: '', line: '', sub: '', dist: '', prov: '', zip: '' });
   var pays = [['promptpay', 'PromptPay', 'Scan QR จากแอปธนาคารหลังสั่งซื้อ'], ['card', 'Credit / debit card', 'จ่ายผ่าน payment provider'], ['bank', 'Bank transfer', 'โอนแล้วแนบสลิป']];
   var items = CART.map(function (l) { var p = gp(l.id); return p ? '<div class="row"><span>' + esc(p.name) + ' <span class="sm">' + esc(l.c) + ' / ' + esc(l.s) + ' × ' + l.qty + '</span></span><span>' + thb(p.price * l.qty) + '</span></div>' : ''; }).join('');
-  return '<div class="top"><h1>' + t('ชำระเงิน', 'Checkout') + '</h1><a class="sm" href="#/cart">' + t('กลับไปตะกร้า', 'Back to cart') + '</a></div><div class="ck"><div><div class="fm" style="grid-template-columns:1fr 1fr">' + f('em', 'Email', 'name@example.com', 'w2', 'email', 'email') + f('nm', t('ชื่อ-นามสกุล', 'Full name'), 'ชื่อ-นามสกุล', 'w2') + f('ph', t('โทรศัพท์', 'Phone'), '081 234 5678', 'w2', 'tel', 'tel') + f('ad', t('ที่อยู่', 'Address'), 'บ้านเลขที่ หมู่ ซอย ถนน', 'w2', 'text', 'street-address') + f('sd', t('แขวง/ตำบล', 'Subdistrict'), '', '', 'text') + f('ds', t('เขต/อำเภอ', 'District'), '', '', 'text') +
-    '<label>' + t('จังหวัด', 'Province') + '<input id="pv" list="pvl" placeholder="' + t('เลือกหรือพิมพ์จังหวัด', 'Select province') + '"></label><datalist id="pvl">' + PROV.map(function (p) { return '<option value="' + p + '">'; }).join('') + '</datalist>' + f('zp', t('รหัสไปรษณีย์', 'Postcode'), '10110', '', 'text', 'postal-code') + '</div>' +
+  return '<div class="top"><h1>' + t('ชำระเงิน', 'Checkout') + '</h1><a class="sm" href="#/cart">' + t('กลับไปตะกร้า', 'Back to cart') + '</a></div>' + (SB_USER && ad0.line ? '<p class="sm">' + t('ดึงที่อยู่จากบัญชีให้แล้ว — แก้ได้ตรงนี้', 'Address filled from your account — editable here') + '</p>' : '') + '<div class="ck"><div><div class="fm" style="grid-template-columns:1fr 1fr">' + f('em', 'Email', 'name@example.com', 'w2', 'email', 'email', SB_USER ? SB_USER.email : '') + f('nm', t('ชื่อ-นามสกุล', 'Full name'), 'ชื่อ-นามสกุล', 'w2', 'text', '', ad0.name) + f('ph', t('โทรศัพท์', 'Phone'), '081 234 5678', 'w2', 'tel', 'tel', ad0.phone) + f('ad', t('ที่อยู่', 'Address'), 'บ้านเลขที่ หมู่ ซอย ถนน', 'w2', 'text', 'street-address', ad0.line) + f('sd', t('แขวง/ตำบล', 'Subdistrict'), '', '', 'text', '', ad0.sub) + f('ds', t('เขต/อำเภอ', 'District'), '', '', 'text', '', ad0.dist) +
+    '<label>' + t('จังหวัด', 'Province') + '<input id="pv" list="pvl" placeholder="' + t('เลือกหรือพิมพ์จังหวัด', 'Select province') + '" value="' + esc(ad0.prov) + '"></label><datalist id="pvl">' + PROV.map(function (p) { return '<option value="' + p + '">'; }).join('') + '</datalist>' + f('zp', t('รหัสไปรษณีย์', 'Postcode'), '10110', '', 'text', 'postal-code', ad0.zip) + '</div>' +
     '<h3 style="font-size:28px;margin:28px 0 12px">' + t('ชำระเงิน', 'Payment') + '</h3><div style="display:grid;gap:10px">' + pays.map(function (a, i) { return '<label class="pay"><input type="radio" name="pay" value="' + a[0] + '"' + (i ? '' : ' checked') + '><span><b>' + a[1] + '</b><br>' + a[2] + '</span></label>'; }).join('') + '</div></div>' +
     '<div class="fm" style="grid-template-columns:1fr;position:sticky;top:80px"><h3 style="font-size:28px">' + t('สรุปคำสั่งซื้อ', 'Order summary') + '</h3>' + items + sumbox(calc(), 0) + '<button class="btn p" onclick="place()">' + t('สั่งซื้อ', 'Place order') + '</button></div></div>';
 }
-function place() {
+async function place() {
   var g = function (i) { return (document.getElementById(i).value || '').trim(); }, em = g('em'), ph = g('ph').replace(/[\s-]/g, '').replace(/^\+66/, '0'), zp = g('zp'), err = null;
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) err = t('กรอกอีเมลให้ถูกต้อง', 'Enter a valid email address');
   else if (!g('nm')) err = t('กรอกชื่อ-นามสกุล', 'Enter your full name');
@@ -358,7 +359,13 @@ function place() {
   var r = calc(), now = new Date().toISOString();
   var o = { no: 'JT-' + Date.now().toString(36).toUpperCase(), at: now, cust: { email: em, name: g('nm'), phone: ph }, addr: { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp }, items: items, sub: r.sub, d: r.d, ship: r.ship, total: r.total, code: DC, pay: document.querySelector('input[name=pay]:checked').value, status: 'new', track: '', note: '', stockDone: 0, log: [{ t: now, s: 'Order placed' }] };
   ORDS[o.no] = o; try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
-  dbSaveOrder(o); CART = []; DC = ''; csave(); location.hash = '#/done/' + o.no;
+  dbSaveOrder(o);
+  // จำที่อยู่เข้าบัญชี (ครั้งแรกสั่งแล้วครั้งต่อไปดึงมาเอง)
+  if (SB_USER && sb()) {
+    try { await sb().from('profiles').update({ full_name: g('nm'), phone: ph, address: { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp } }).eq('id', SB_USER.id); } catch (e) {}
+    try { if (SB_PROFILE) { SB_PROFILE.full_name = g('nm'); SB_PROFILE.phone = ph; SB_PROFILE.address = { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp }; } } catch (e) {}
+  }
+  CART = []; DC = ''; csave(); location.hash = '#/done/' + o.no;
 }
 function doneView(no) {
   var o = ORDS[no]; if (!o) return '<div class="top"><h1>' + t('ไม่พบคำสั่งซื้อ', 'Order not found') + '</h1></div>';
@@ -703,10 +710,24 @@ function jtSupabase() {
   var spent = mine.reduce(function (a, o) { return a + Number(o.total || 0); }, 0);
   var since = SB_PROFILE && SB_PROFILE.created_at ? new Date(SB_PROFILE.created_at).toLocaleDateString('en-GB') : '-';
   var acc = '<div class="jt-panel"><div class="jt-form"><label class="full">' + t('ชื่อที่แสดง', 'Display name') + '<input id="pf_name" value="' + esc((SB_PROFILE && SB_PROFILE.display_name) || '') + '" placeholder="' + esc((SB_USER.email || '').split('@')[0]) + '"></label><label class="full">Email<input value="' + esc(SB_USER.email) + '" disabled></label></div><div style="margin-top:8px"><button class="btn s" onclick="sbSaveProfile()">' + t('บันทึกชื่อ', 'Save name') + '</button></div><div class="jt-grid" style="margin-top:12px;grid-template-columns:repeat(4,1fr)"><div class="jt-kpi"><span>' + t('บทบาท', 'Role') + '</span><b style="font-size:18px">' + esc(roleLabel()) + '</b></div><div class="jt-kpi"><span>' + t('สมาชิกตั้งแต่', 'Member since') + '</span><b style="font-size:18px">' + since + '</b></div><div class="jt-kpi"><span>' + t('ออเดอร์ของฉัน', 'My orders') + '</span><b>' + mine.length + '</b></div><div class="jt-kpi"><span>' + t('ยอดซื้อสะสม', 'Total spent') + '</span><b>' + bt(spent) + '</b></div></div><div style="margin-top:8px"><a class="btn s" href="#/account/orders">' + t('ดูออเดอร์', 'View orders') + '</a> <a class="btn s" href="#/wishlist">' + t('วิชลิสต์', 'Wishlist') + ' (' + WL.length + ')</a></div></div>';
+  var ad = myAddr();
+  var adbox = '<div class="jt-panel"><h3 style="font-size:24px">' + t('ที่อยู่จัดส่งของฉัน', 'My shipping address') + '</h3><p class="sm">' + t('บันทึกไว้ครั้งเดียว checkout ครั้งต่อไปดึงมาให้เอง', 'Saved once — auto-filled at checkout') + '</p><div class="jt-form" style="margin-top:8px"><label class="full">' + t('ชื่อ-นามสกุล', 'Full name') + '<input id="ad_nm" value="' + esc(ad.name) + '"></label><label class="full">' + t('โทรศัพท์', 'Phone') + '<input id="ad_ph" value="' + esc(ad.phone) + '"></label><label class="full">' + t('ที่อยู่', 'Address') + '<input id="ad_ad" value="' + esc(ad.line) + '"></label><label>' + t('แขวง/ตำบล', 'Subdistrict') + '<input id="ad_sd" value="' + esc(ad.sub) + '"></label><label>' + t('เขต/อำเภอ', 'District') + '<input id="ad_ds" value="' + esc(ad.dist) + '"></label><label>' + t('จังหวัด', 'Province') + '<input id="ad_pv" list="adpvl" value="' + esc(ad.prov) + '"></label><datalist id="adpvl">' + PROV.map(function (p) { return '<option value="' + p + '">'; }).join('') + '</datalist><label>' + t('รหัสไปรษณีย์', 'Postcode') + '<input id="ad_zp" value="' + esc(ad.zip) + '"></label></div><div style="margin-top:8px"><button class="btn s" onclick="sbSaveAddress()">' + t('บันทึกที่อยู่', 'Save address') + '</button></div></div>';
   var pwbox = '<div class="jt-panel"><div class="jt-form"><label class="full">' + t('รหัสผ่านใหม่ (≥6 ตัว)', 'New password (min 6)') + '<input id="np_pass" type="password"></label></div><div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn s" onclick="sbChangePass()">' + t('เปลี่ยนรหัสผ่าน', 'Change password') + '</button><button class="btn" onclick="sbLogout()">Logout</button></div></div>';
   var conn = isOwner() ? '<div class="jt-panel"><div class="jt-form"><label class="full">Supabase URL<input id="sb_url" value="' + esc(SB.url) + '"></label><label class="full">Anon key<input id="sb_key" value="' + esc((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || ls.key || '') + '"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbSave()">Save & connect</button><button class="btn d" onclick="SBClear()">Disconnect</button></div></div>' : '';
-  return jtShell(t('บัญชี', 'Account'), '#/admin/system/supabase', acc + pwbox + conn);
+  return jtShell(t('บัญชี', 'Account'), '#/admin/system/supabase', acc + adbox + pwbox + conn);
 }
+function myAddr() {
+  var a = (SB_PROFILE && SB_PROFILE.address) || {};
+  return { name: (SB_PROFILE && SB_PROFILE.full_name) || '', phone: (SB_PROFILE && SB_PROFILE.phone) || '', line: a.line || '', sub: a.sub || '', dist: a.dist || '', prov: a.prov || '', zip: a.zip || '' };
+}
+window.sbSaveAddress = async function () {
+  var c = sb(); if (!c || !SB_USER) return;
+  var v = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); };
+  var addr = { line: v('ad_ad'), sub: v('ad_sd'), dist: v('ad_ds'), prov: v('ad_pv'), zip: v('ad_zp') };
+  var r = await c.from('profiles').update({ full_name: v('ad_nm'), phone: v('ad_ph'), address: addr }).eq('id', SB_USER.id);
+  if (r.error) T(r.error.message);
+  else { if (SB_PROFILE) { SB_PROFILE.full_name = v('ad_nm'); SB_PROFILE.phone = v('ad_ph'); SB_PROFILE.address = addr; } T(t('บันทึกที่อยู่แล้ว', 'Address saved')); go(); }
+};
 window.sbSaveProfile = async function () {
   var c = sb(); if (!c || !SB_USER) return;
   var v = ((document.getElementById('pf_name') || {}).value || '').trim();
