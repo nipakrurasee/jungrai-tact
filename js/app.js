@@ -712,7 +712,6 @@ window.sbSaveProfile = async function () {
   var r = await c.from('profiles').update({ display_name: v }).eq('id', SB_USER.id);
   if (r.error) T(r.error.message); else { if (SB_PROFILE) SB_PROFILE.display_name = v; T(t('บันทึกแล้ว', 'Saved')); go(); }
 };
-}
 window.sbChangePass = async function () {
   var c = sb(); var pw = ((document.getElementById('np_pass') || {}).value || '');
   if (pw.length < 6) { T(t('รหัสผ่านอย่างน้อย 6 ตัว', 'Password min 6 chars')); return; }
