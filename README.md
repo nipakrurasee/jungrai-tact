@@ -33,6 +33,7 @@ vercel.json / netlify.toml  # รองรับ SPA routing
 7. New query อีกอัน → ก็อป `supabase/migration_product_images.sql` → **Run** (รูปประจำสินค้า 8 ตัว — เฉพาะตัวที่ยังไม่มีรูป)
 8. New query อีกอัน → ก็อป `supabase/migration_profile_address.sql` → **Run** (ที่อยู่ member ผูกบัญชี + checkout ดึงอัตโนมัติ)
 9. New query อีกอัน → ก็อป `supabase/migration_color_images.sql` → **Run** (รูปแยกตามสี)
+10. New query อีกอัน → ก็อป `supabase/migration_color_stock.sql` → **Run** (สต็อกแยกสีในสินค้าเดียว)
 5. เมนู **Storage** → ตรวจว่ามี bucket `product-images` + `slide-images` (สร้างจาก SQL แล้ว, เป็น public)
 6. เมนู **Project Settings → API** → ก็อป `Project URL` + `anon public key`
 7. เมนู **Authentication → Users → Add user** → เพิ่มอีเมล owner + shop_admin + ทดสอบ member

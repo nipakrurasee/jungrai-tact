@@ -3,7 +3,7 @@
 var CM = { 'Olive Drab': '#5a5d3a', 'Sand': '#c2b28f', 'Black': '#1d1d1b', 'Concrete': '#8a8b86' };
 var CAT = ['Apparel', 'Field Gear', 'Accessories', 'Patches'];
 function mk(id, n, cat, col, pr, cp, cost, st, cl, sz, ft, d) {
-  return { id: id, name: n, sku: id.toUpperCase(), barcode: '', cat: cat, coll: col, price: pr, compare: cp, cost: cost, stock: st, low: 5, status: 'active', featured: ft, colors: cl, sizes: sz, tags: '', desc: d, material: '', dims: '', spec: '', notes: '' };
+  return { id: id, name: n, sku: id.toUpperCase(), barcode: '', cat: cat, coll: col, price: pr, compare: cp, cost: cost, stock: st, cstock: {}, low: 5, status: 'active', featured: ft, colors: cl, sizes: sz, tags: '', desc: d, material: '', dims: '', spec: '', notes: '' };
 }
 var A = ['Olive Drab', 'Sand', 'Black'], S = ['S', 'M', 'L', 'XL'];
 var SEED_PRODUCTS = [
@@ -88,6 +88,11 @@ function thb(n) { return CUR == 'USD' ? '$' + Math.round(n / 35).toLocaleString(
 function bt(n) { return '฿' + Number(n).toLocaleString('en-US'); }
 function sb() { return (window.SB && SB.configured && SB.client) ? SB.client : null; }
 function av(p) { return p.stock <= 0 ? ['so', t('หมด', 'Sold out')] : p.stock <= p.low ? ['lo', t('เหลือน้อย — เหลือ ', 'Low stock — ') + p.stock + t(' ชิ้น', ' left')] : ['', t('มีของ', 'In stock')]; }
+/* สต็อกแยกสี: มี key = ใช้รายสี, ว่าง = สต็อกรวมเดิม */
+function hasCS(p) { return !!(p.cstock && Object.keys(p.cstock).length); }
+function cstockOf(p, c) { if (!hasCS(p)) return p.stock; return Math.max(0, parseInt(p.cstock[c], 10) || 0); }
+function cstockSum(cs) { return Object.keys(cs || {}).reduce(function (a, k) { return a + Math.max(0, parseInt(cs[k], 10) || 0); }, 0); }
+function csText(p) { if (!hasCS(p)) return ''; return Object.keys(p.cstock).map(function (k) { return k + ': ' + p.cstock[k]; }).join(', '); }
 function swatch(c) {
   if (CM[c]) return CM[c];
   var h = 0; String(c || '').split('').forEach(function (x) { h = (h * 31 + x.charCodeAt(0)) % 360; });
@@ -177,7 +182,7 @@ async function loadSupabase() {
     var pr = await c.from('products').select('*').order('created_at');
     if (pr.data && pr.data.length) {
       P = pr.data.map(function (r) {
-        return { id: r.id, name: r.name, sku: r.sku, barcode: r.barcode || '', cat: r.category, coll: r.collection, price: r.price, compare: r.compare_at, cost: r.cost, stock: r.stock, low: r.low_threshold, status: r.status, featured: r.featured, colors: r.colors || ['Black'], sizes: r.sizes || ['One size'], tags: r.tags || '', desc: r.description || '', spec: r.spec || '', material: r.material || '', dims: r.dims || '', notes: r.notes || '' };
+        return { id: r.id, name: r.name, sku: r.sku, barcode: r.barcode || '', cat: r.category, coll: r.collection, price: r.price, compare: r.compare_at, cost: r.cost, stock: r.stock, cstock: r.stock_by_color || {}, low: r.low_threshold, status: r.status, featured: r.featured, colors: r.colors || ['Black'], sizes: r.sizes || ['One size'], tags: r.tags || '', desc: r.description || '', spec: r.spec || '', material: r.material || '', dims: r.dims || '', notes: r.notes || '' };
       });
       IM = {}; CIM = {}; pr.data.forEach(function (r) { if (r.image_urls && r.image_urls.length) IM[r.id] = r.image_urls; if (r.color_images && Object.keys(r.color_images).length) CIM[r.id] = r.color_images; });
       imgFallback();
@@ -227,7 +232,7 @@ async function loadSupabase() {
 }
 async function dbUpsertProduct(o) {
   var c = sb(); if (!c) return;
-  await c.from('products').upsert({ id: o.id, name: o.name, sku: o.sku, barcode: o.barcode, category: o.cat, collection: o.coll, price: o.price, compare_at: o.compare, cost: o.cost, stock: o.stock, low_threshold: o.low, status: o.status, featured: o.featured ? 1 : 0, colors: o.colors, sizes: o.sizes, tags: o.tags, description: o.desc, spec: o.spec, material: o.material, dims: o.dims, notes: o.notes, image_urls: IM[o.id] || [], color_images: CIM[o.id] || {} }, { onConflict: 'id' });
+  await c.from('products').upsert({ id: o.id, name: o.name, sku: o.sku, barcode: o.barcode, category: o.cat, collection: o.coll, price: o.price, compare_at: o.compare, cost: o.cost, stock: o.stock, stock_by_color: o.cstock || {}, low_threshold: o.low, status: o.status, featured: o.featured ? 1 : 0, colors: o.colors, sizes: o.sizes, tags: o.tags, description: o.desc, spec: o.spec, material: o.material, dims: o.dims, notes: o.notes, image_urls: IM[o.id] || [], color_images: CIM[o.id] || {} }, { onConflict: 'id' });
 }
 async function dbDeleteProduct(id) { var c = sb(); if (!c) return; await c.from('products').delete().eq('id', id); }
 async function dbSaveOrder(o) {
@@ -301,13 +306,16 @@ function prod(id) {
   var p = P.filter(function (x) { return x.id == id; })[0];
   if (!p || p.status != 'active') return '<p>' + t('สินค้านี้ไม่พร้อมขาย', 'This product is not available.') + ' <a href="#/shop" style="text-decoration:underline">' + t('กลับไปดูสินค้า', 'Back to collection') + '</a></p>';
   SEL.c = SEL.c && p.colors.indexOf(SEL.c) > -1 ? SEL.c : p.colors[0]; SEL.s = SEL.s && p.sizes.indexOf(SEL.s) > -1 ? SEL.s : p.sizes[0]; var a = av(p);
+  var csN = hasCS(p) ? cstockOf(p, SEL.c) : p.stock;
+  if (Q > Math.max(1, csN)) Q = Math.max(1, csN);
+  var csMsg = hasCS(p) ? '<div class="sm" style="margin-top:6px">' + t('สีนี้เหลือ ', 'This color: ') + csN + t(' ชิ้น · ทั้งหมด ', ' left · total ') + p.stock + t(' ชิ้น', '') + '</div>' : '';
   function dt(t, x, d) { return '<details><summary>' + t + '</summary><p>' + esc(x || d || 'Details will be added soon.') + '</p></details>'; }
   return '<p class="sm" style="margin-bottom:20px"><a href="#/shop">Collection</a> / ' + esc(p.cat) + '</p><div class="pp">' + gal(p) +
     '<div class="pi"><span class="sm">' + esc(p.coll) + '</span><div class="row"><h1 style="flex:1">' + esc(p.name) + '</h1>' + wishBtn(p.id) + '</div><div class="price">' + thb(p.price) + (p.compare > p.price ? '<s>' + thb(p.compare) + '</s>' : '') + '</div><p style="color:#b9b8ae">' + esc(p.desc) + '</p>' +
     '<div><span class="sm">' + t('สี', 'Color') + ' — ' + esc(SEL.c) + '</span><div class="opt">' + p.colors.map(function (c) { return '<button class="sw" aria-label="' + esc(c) + '" aria-pressed="' + (c == SEL.c) + '" onclick="SEL.c=\'' + esc(c) + '\';GIDX[\'' + esc(p.id) + '\']=0;go()"><i style="background:' + swatch(c) + '"></i></button>'; }).join('') + '</div></div>' +
     '<div><span class="sm">' + t('ไซส์', 'Size') + '</span><div class="opt">' + p.sizes.map(function (s) { return '<button aria-pressed="' + (s == SEL.s) + '" onclick="SEL.s=\'' + esc(s) + '\';go()">' + esc(s) + '</button>'; }).join('') + '</div></div>' +
-    '<div class="av ' + a[0] + '"><b></b>' + a[1] + '</div><div class="qty"><button aria-label="Less" onclick="Q=Math.max(1,Q-1);go()">–</button><span>' + Q + '</span><button aria-label="More" onclick="Q++;go()">+</button></div>' +
-    (p.stock > 0 ? '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn p" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ')">' + t('หยิบใส่ตะกร้า', 'Add to cart') + '</button><button class="btn" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ',1);location.hash=\'#/checkout\'">' + t('ซื้อเลย', 'Buy now') + '</button></div>' : '<button class="btn" disabled style="opacity:.5">' + t('หมด', 'Sold out') + '</button>') +
+    '<div class="av ' + (csN <= 0 ? 'so' : a[0]) + '"><b></b>' + (csN <= 0 ? t('สีนี้หมด', 'Out in this color') : a[1]) + '</div>' + csMsg + '<div class="qty"><button aria-label="Less" onclick="Q=Math.max(1,Q-1);go()">–</button><span>' + Q + '</span><button aria-label="More" onclick="Q=Math.min(' + Math.max(1, csN) + ',Q+1);go()">+</button></div>' +
+    (csN > 0 ? '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn p" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ')">' + t('หยิบใส่ตะกร้า', 'Add to cart') + '</button><button class="btn" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ',1);location.hash=\'#/checkout\'">' + t('ซื้อเลย', 'Buy now') + '</button></div>' : '<button class="btn" disabled style="opacity:.5">' + t('หมด', 'Sold out') + '</button>') +
     '<div style="margin-top:12px">' + dt(t('รายละเอียด', 'Description'), p.desc) + dt(t('สเปก', 'Specifications'), p.spec) + dt(t('วัสดุ', 'Material'), p.material) + dt(t('ขนาด', 'Dimensions'), p.dims) + dt(t('โน้ตภาคสนาม', 'Field notes'), p.notes) + dt(t('การดูแล', 'Care'), t('ซักน้ำเย็น ตากแห้ง ห้ามฟอกขาว', 'Machine wash cold, hang dry. Do not bleach.')) + dt(t('จัดส่ง', 'Shipping'), t('ส่งใน 1–2 วันทำการทั่วไทย', 'Ships within 1–2 business days across Thailand.')) + dt(t('คืนสินค้า', 'Returns'), t('ของไม่ใช้แล้วคืนได้ใน 14 วัน', 'Unused items can be returned within 14 days.')) + '</div></div></div>' + reviewBlock(p.id);
 }
 
@@ -362,12 +370,12 @@ window.rvDel = async function (id) {
 /* ---------- cart / checkout ---------- */
 function csave() { try { localStorage.setItem('jg_cart', JSON.stringify(CART)); } catch (e) {} cnt(); }
 function cadd(id, c, s, q, quiet) {
-  var p = gp(id), mx = p ? p.stock : 0, f = CART.filter(function (x) { return x.id == id && x.c == c && x.s == s; })[0];
-  if (mx < 1) { T(t('หมด', 'Sold out')); return; }
+  var p = gp(id), mx = p ? (hasCS(p) ? cstockOf(p, c) : p.stock) : 0, f = CART.filter(function (x) { return x.id == id && x.c == c && x.s == s; })[0];
+  if (mx < 1) { T(t('สีนี้หมด', 'Out in this color')); return; }
   if (f) f.qty = Math.min(mx, f.qty + q); else CART.push({ id: id, c: c, s: s, qty: Math.min(mx, q) });
   csave(); if (!quiet) T(t('หยิบใส่ตะกร้าแล้ว', 'Added to cart'));
 }
-function cq(i, d) { var l = CART[i], p = gp(l.id); l.qty = Math.max(1, Math.min(p ? p.stock : 1, l.qty + d)); csave(); go(); }
+function cq(i, d) { var l = CART[i], p = gp(l.id), mx = p ? (hasCS(p) ? cstockOf(p, l.c) : p.stock) : 1; l.qty = Math.max(1, Math.min(mx, l.qty + d)); csave(); go(); }
 function crm(i) { CART.splice(i, 1); csave(); go(); }
 function calc() {
   var sub = 0; CART.forEach(function (l) { var p = gp(l.id); if (p) sub += p.price * l.qty; });
@@ -410,7 +418,7 @@ async function place() {
   else if (!/^\d{5}$/.test(zp)) err = t('รหัสไปรษณีย์ต้อง 5 หลัก', 'Postcode must be 5 digits');
   if (err) { T(err); return; }
   var items = [], bad = 0;
-  CART.forEach(function (l) { var p = gp(l.id); if (!p || p.stock < l.qty) { bad = 1; return; } items.push({ id: p.id, name: p.name, sku: p.sku, c: l.c, s: l.s, qty: l.qty, price: p.price }); });
+  CART.forEach(function (l) { var p = gp(l.id); var ok = p ? (hasCS(p) ? cstockOf(p, l.c) : p.stock) : 0; if (!p || ok < l.qty) { bad = 1; return; } items.push({ id: p.id, name: p.name, sku: p.sku, c: l.c, s: l.s, qty: l.qty, price: p.price }); });
   if (bad || !items.length) { T(t('บางชิ้นหมดแล้ว ปรับตะกร้าใหม่', 'Some items are no longer available.')); return; }
   var r = calc(), now = new Date().toISOString();
   var o = { no: 'JT-' + Date.now().toString(36).toUpperCase(), at: now, cust: { email: em, name: g('nm'), phone: ph }, addr: { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp }, items: items, sub: r.sub, d: r.d, ship: r.ship, total: r.total, code: DC, pay: document.querySelector('input[name=pay]:checked').value, status: 'new', track: '', note: '', stockDone: 0, log: [{ t: now, s: 'Order placed' }] };
@@ -473,7 +481,7 @@ function admin() {
         '<div class="w4" style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn s" href="#/p/' + esc(p.id) + '">' + t('ดูหน้าร้าน', 'View storefront') + '</a></div>' +
         kv('ID', p.id) + kv('Barcode', p.barcode) + kv(t('หมวด', 'Category'), p.cat) + kv(t('คอลเลกชัน', 'Collection'), p.coll) +
         kv(t('ราคา', 'Price'), bt(p.price)) + kv(t('เทียบราคา', 'Compare-at'), p.compare ? bt(p.compare) : '') + kv(t('ต้นทุน', 'Cost'), p.cost ? bt(p.cost) : '') + kv(t('กำไร/ชิ้น', 'Margin'), (p.price - (p.cost || 0)) ? bt(p.price - (p.cost || 0)) : '') +
-        kv(t('สต็อก', 'Stock'), p.stock + ' (' + t('เตือนที่ ', 'low at ') + p.low + ')') + kv(t('สี', 'Colors'), p.colors) + kv(t('ไซส์', 'Sizes'), p.sizes) + kv('Tags', p.tags) +
+        kv(t('สต็อก', 'Stock'), p.stock + ' (' + t('เตือนที่ ', 'low at ') + p.low + ')' + (csText(p) ? ' — ' + csText(p) : '')) + kv(t('สี', 'Colors'), p.colors) + kv(t('ไซส์', 'Sizes'), p.sizes) + kv('Tags', p.tags) +
         '<div class="w4">' + kv(t('อธิบาย', 'Description'), p.desc) + kv('Spec', p.spec) + kv(t('วัสดุ', 'Material'), p.material) + kv(t('ขนาด', 'Dimensions'), p.dims) + kv(t('โน้ต', 'Notes'), p.notes) + '</div></div></td></tr>';
     }
   });
@@ -486,7 +494,7 @@ function form() {
     '<label>Status<select data-k="status">' + ['active', 'draft', 'archived'].map(function (c) { return '<option' + (E.status == c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label>' +
     '<label>Featured<select data-k="featured"><option value="0">No</option><option value="1"' + (E.featured ? ' selected' : '') + '>Yes</option></select></label>' +
     fld('price', 'Price (THB)', 'number') + fld('compare', 'Compare-at', 'number') + fld('cost', 'Cost', 'number') + fld('stock', 'Stock', 'number') + fld('low', 'Low threshold', 'number') +
-    fld('colors', 'Colors (comma)', '', 'w2') + fld('sizes', 'Sizes (comma)', '', 'w2') + fld('tags', 'Tags', '', 'w4') + fld('desc', 'Short description', 'ta', 'w4') + fld('spec', 'Specifications', 'ta', 'w2') + fld('material', 'Material', 'ta', 'w2') + fld('dims', 'Dimensions', 'ta', 'w2') + fld('notes', 'Field notes', 'ta', 'w2') + imgui() + '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">' + t('บันทึกสินค้า', 'Save product') + '</button><button class="btn" onclick="E=null;go()">' + t('ยกเลิก', 'Cancel') + '</button></div></div>';
+    fld('colors', 'Colors (comma)', '', 'w2') + fld('sizes', 'Sizes (comma)', '', 'w2') + fld('tags', 'Tags', '', 'w4') + csui() + fld('desc', 'Short description', 'ta', 'w4') + fld('spec', 'Specifications', 'ta', 'w2') + fld('material', 'Material', 'ta', 'w2') + fld('dims', 'Dimensions', 'ta', 'w2') + fld('notes', 'Field notes', 'ta', 'w2') + imgui() + '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">' + t('บันทึกสินค้า', 'Save product') + '</button><button class="btn" onclick="E=null;go()">' + t('ยกเลิก', 'Cancel') + '</button></div></div>';
 }
 function edit(i) { E = i < 0 ? mk('new-' + Date.now().toString(36), '', 'Apparel', 'Core', 0, 0, 0, 0, ['Black'], ['One size'], 0, '') : JSON.parse(JSON.stringify(P[i])); E._i = i; EI = (IM[E.id] || []).map(function (u) { return { u: u, c: '' }; }); Object.keys(CIM[E.id] || {}).forEach(function (col) { (CIM[E.id][col] || []).forEach(function (u) { EI.push({ u: u, c: col }); }); }); if (i < 0) { E.status = 'draft'; E.sku = ''; } go(); var f = $('#fm'); f && f.scrollIntoView({ behavior: 'smooth' }); }
 async function commit() {
@@ -494,13 +502,17 @@ async function commit() {
   if (!isOwner() && myRole() === 'shop_admin' && arguments.length === 0) { /* stock-only enforced below */ }
   var o = JSON.parse(JSON.stringify(E)), i = o._i; delete o._i;
   document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k, v = e.value; if (['price', 'compare', 'cost', 'stock', 'low'].indexOf(k) > -1) v = Math.max(0, parseInt(v, 10) || 0); else if (k == 'colors' || k == 'sizes') v = v.split(',').map(function (x) { return x.trim(); }).filter(Boolean); else if (k == 'featured') v = v == '1' ? 1 : 0; o[k] = v; });
+  var csm = {}; document.querySelectorAll('#fm [data-cs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) csm[e.dataset.cs] = v; });
+  o.cstock = csm;
+  if (Object.keys(csm).length) o.stock = cstockSum(csm); // ยอดรวม = ผลรวมรายสี
   if (!o.name.trim()) { T(t('กรอกชื่อสินค้า', 'Enter a product name')); return; }
   if (!o.colors.length) o.colors = ['Black']; if (!o.sizes.length) o.sizes = ['One size'];
   if (o._new !== false && i < 0) o.id = 'p-' + Date.now().toString(36);
   if (!o.sku.trim()) o.sku = o.id.toUpperCase();
   if (myRole() === 'shop_admin' && i >= 0) {
-    // shop_admin แก้ได้เฉพาะ stock/low/status — คงค่าอื่นจากของเดิม
+    // shop_admin แก้ได้เฉพาะ stock/low/status (+ สต็อกรายสี) — คงค่าอื่นจากของเดิม
     var keep = P[i]; ['name', 'sku', 'barcode', 'cat', 'coll', 'price', 'compare', 'cost', 'featured', 'colors', 'sizes', 'tags', 'desc', 'spec', 'material', 'dims', 'notes'].forEach(function (k) { o[k] = keep[k]; });
+    if (Object.keys(o.cstock || {}).length) o.stock = cstockSum(o.cstock);
   }
   if (i < 0 && myRole() === 'shop_admin') { T('สร้างสินค้าได้เฉพาะ owner'); return; }
   if (i < 0) P.push(o); else { o.id = P[i].id; P[i] = o; }
@@ -522,6 +534,10 @@ function ecols() {
   return String(v || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
 }
 function eiset(i, v) { sync(); EI[i].c = v; redraw(); }
+function csui() {
+  var cols = ecols(); if (!cols.length) return '';
+  return '<div class="w4"><span>' + t('สต็อกแยกสี (เว้นว่าง = ใช้สต็อกรวม)', 'Stock per color (blank = use total)') + '</span><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">' + cols.map(function (c) { return '<label style="min-width:110px">' + esc(c) + '<input data-cs="' + esc(c) + '" type="number" min="0" value="' + ((E.cstock && E.cstock[c] != null) ? E.cstock[c] : '') + '" placeholder="' + t('รวม', 'total') + '"></label>'; }).join('') + '</div></div>';
+}
 function imgui() {
   var cols = ecols();
   function cosel(s, i) { return '<select onchange="eiset(' + i + ',this.value)" style="margin-top:6px;width:100%"><option value="">' + t('ทุกสี', 'All colors') + '</option>' + cols.map(function (c) { return '<option value="' + esc(c) + '"' + (s.c === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>'; }
@@ -670,7 +686,14 @@ function adminOrd() {
 async function ost(no, v) {
   if (!isStaff()) { T('ต้อง login เป็น staff'); return; }
   var o = ORDS[no]; o.status = v; o.log.push({ t: new Date().toISOString(), s: 'Status → ' + v + ' by ' + myRole() });
-  if (v == 'paid' && !o.stockDone) { o.items.forEach(function (l) { var p = gp(l.id); if (p) p.stock = Math.max(0, p.stock - l.qty); }); o.stockDone = 1; P.forEach(function (p) { dbUpsertProduct(p); }); saveLocal(); }
+  if (v == 'paid' && !o.stockDone) {
+    o.items.forEach(function (l) {
+      var p = gp(l.id); if (!p) return;
+      if (hasCS(p)) { p.cstock[l.c] = Math.max(0, (parseInt(p.cstock[l.c], 10) || 0) - l.qty); p.stock = cstockSum(p.cstock); }
+      else p.stock = Math.max(0, p.stock - l.qty);
+    });
+    o.stockDone = 1; P.forEach(function (p) { dbUpsertProduct(p); }); saveLocal();
+  }
   try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
   await dbUpdateOrder(no, { status: v, tracking: o.track, note: o.note, log: o.log, stock_deducted: o.stockDone ? 1 : 0 });
   go();
@@ -720,7 +743,7 @@ function jtDashboard() {
   var os = Object.keys(ORDS).map(function (k) { return ORDS[k]; }), sales = os.filter(function (o) { return !['cancelled', 'refunded'].includes(o.status); }).reduce(function (a, o) { return a + Number(o.total || 0); }, 0), pending = os.filter(function (o) { return ['new'].includes(o.status); }).length;
   return jtShell(t('แดชบอร์ด', 'Dashboard'), '#/admin/dashboard', '<div class="jt-grid"><div class="jt-kpi"><span>' + t('สินค้า', 'Products') + '</span><b>' + P.length + '</b></div><div class="jt-kpi"><span>' + t('ออเดอร์', 'Orders') + '</span><b>' + os.length + '</b></div><div class="jt-kpi"><span>' + t('ยอดขาย', 'Sales') + '</span><b>' + bt(sales) + '</b></div><div class="jt-kpi"><span>' + t('บทบาท', 'Role') + '</span><b style="font-size:20px">' + esc(roleLabel()) + '</b></div></div><div class="jt-panel"><span class="jgt-kpi">Mode</span><p>' + (sb() ? 'Supabase live: ' + esc(SB.url) + ' · ' + esc(SB_USER ? SB_USER.email : 'guest') : t('Local mode — ตั้งค่า Supabase ที่ SYSTEM › Supabase', 'Local mode — connect Supabase under SYSTEM › Supabase')) + '</p></div>');
 }
-function jtInventory() { return jtShell(t('สต็อก', 'Inventory'), '#/admin/inventory', '<div class="jt-panel"><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>SKU</th><th>' + t('สต็อก', 'Stock') + '</th><th>' + t('สถานะ', 'Status') + '</th></tr>' + P.map(function (p) { var n2 = Number(p.stock || 0); return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.sku) + '</td><td>' + n2 + '</td><td>' + (n2 <= 0 ? t('หมด', 'OUT') : n2 <= Number(p.low || 5) ? t('น้อย', 'LOW') : t('ปกติ', 'IN')) + '</td></tr>'; }).join('') + '</table></div>'); }
+function jtInventory() { return jtShell(t('สต็อก', 'Inventory'), '#/admin/inventory', '<div class="jt-panel"><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>SKU</th><th>' + t('สต็อก', 'Stock') + '</th><th>' + t('แยกสี', 'By color') + '</th><th>' + t('สถานะ', 'Status') + '</th></tr>' + P.map(function (p) { var n2 = Number(p.stock || 0); return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.sku) + '</td><td>' + n2 + '</td><td>' + esc(csText(p) || '-') + '</td><td>' + (n2 <= 0 ? t('หมด', 'OUT') : n2 <= Number(p.low || 5) ? t('น้อย', 'LOW') : t('ปกติ', 'IN')) + '</td></tr>'; }).join('') + '</table></div>'); }
 function jtCustomers() {
   if (CUSTS.length) return jtShell(t('ลูกค้า', 'Customers'), '#/admin/customers', '<div class="jt-panel"><table class="tb"><tr><th>' + t('ชื่อ', 'Name') + '</th><th>Email</th><th>' + t('โทร', 'Phone') + '</th><th>' + t('ออเดอร์', 'Orders') + '</th><th>' + t('ยอดรวม', 'Total') + '</th></tr>' + CUSTS.map(function (c) { return '<tr><td>' + esc(c.name || '-') + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.phone || '-') + '</td><td>' + (c.orders_count || 0) + '</td><td>' + bt(c.total_spent || 0) + '</td></tr>'; }).join('') + '</table></div>');
   var map = {}; Object.keys(ORDS).forEach(function (k) { var o = ORDS[k], c = o.cust || {}; var key = String(c.email || 'guest:' + o.no).toLowerCase(); if (!map[key]) map[key] = { name: c.name || 'Guest', email: c.email || '', phone: c.phone || '', orders: 0, total: 0 }; map[key].orders++; map[key].total += Number(o.total || 0); });
