@@ -67,11 +67,14 @@ function isOwner() { return myRole() === 'owner'; }
 function isStaff() { return myRole() === 'owner' || myRole() === 'shop_admin'; }
 function isMember() { return myRole() === 'member' || isStaff(); }
 function roleLabel() { return { guest: 'Guest', member: 'Member', shop_admin: 'Shop admin', owner: 'Owner' }[myRole()] || myRole(); }
+var SB_PROFILE = null;
 async function loadRole() {
-  var c = sb(); if (!c || !SB_USER) { SB_ROLE = c ? (SB_USER ? 'member' : 'guest') : 'owner'; return; }
+  var c = sb(); SB_PROFILE = null;
+  if (!c || !SB_USER) { SB_ROLE = c ? (SB_USER ? 'member' : 'guest') : 'owner'; return; }
   try {
-    var r = await c.from('profiles').select('role').eq('id', SB_USER.id).single();
-    SB_ROLE = (r.data && r.data.role) || 'member';
+    var r = await c.from('profiles').select('*').eq('id', SB_USER.id).single();
+    if (r.data) { SB_PROFILE = r.data; SB_ROLE = r.data.role || 'member'; }
+    else SB_ROLE = 'member';
   } catch (e) { SB_ROLE = 'member'; }
 }
 var PROV = 'กรุงเทพมหานคร,กระบี่,กาญจนบุรี,กาฬสินธุ์,กำแพงเพชร,ขอนแก่น,จันทบุรี,ฉะเชิงเทรา,ชลบุรี,ชัยนาท,ชัยภูมิ,ชุมพร,เชียงราย,เชียงใหม่,ตรัง,ตราด,ตาก,นครนายก,นครปฐม,นครพนม,นครราชสีมา,นครศรีธรรมราช,นครสวรรค์,นนทบุรี,นราธิวาส,น่าน,บึงกาฬ,บุรีรัมย์,ปทุมธานี,ประจวบคีรีขันธ์,ปราจีนบุรี,ปัตตานี,พระนครศรีอยุธยา,พะเยา,พังงา,พัทลุง,พิจิตร,พิษณุโลก,เพชรบุรี,เพชรบูรณ์,แพร่,ภูเก็ต,มหาสารคาม,มุกดาหาร,แม่ฮ่องสอน,ยโสธร,ยะลา,ร้อยเอ็ด,ระนอง,ระยอง,ราชบุรี,ลพบุรี,ลำปาง,ลำพูน,เลย,ศรีสะเกษ,สกลนคร,สงขลา,สตูล,สมุทรปราการ,สมุทรสงคราม,สมุทรสาคร,สระแก้ว,สระบุรี,สิงห์บุรี,สุโขทัย,สุพรรณบุรี,สุราษฎร์ธานี,สุรินทร์,หนองคาย,หนองบัวลำภู,อ่างทอง,อำนาจเจริญ,อุดรธานี,อุตรดิตถ์,อุทัยธานี,อุบลราชธานี'.split(',');
@@ -693,9 +696,22 @@ function jtSupabase() {
   if (!sb()) return jtShell('Supabase', '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Supabase URL<input id="sb_url" value="' + esc(ls.url || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_URL) || '')) + '" placeholder="https://xyz.supabase.co"></label><label class="full">Anon key (public — ปลอดภัยที่จะอยู่ในเว็บ)<input id="sb_key" value="' + esc(ls.key || ((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || '')) + '" placeholder="eyJ..."></label></div><div style="margin-top:12px"><button class="btn p" onclick="sbSave()">Save & connect</button></div><p class="jgt-muted" style="margin-top:12px">รัน supabase/schema.sql + seed.sql + migration_roles.sql ก่อน แล้วค่อย Save & connect</p></div>');
   // ต่อแล้วแต่ยังไม่ login: ฟอร์ม email+password เข้าเลย (magic link เป็นทางเลือก)
   if (!SB_USER) return jtShell(t('เข้าสู่ระบบ', 'Login'), '#/admin/system/supabase', '<div class="jt-panel"><div class="jt-form"><label class="full">Email<input id="sb_email" type="email" placeholder="owner@jungrai.com" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label><label class="full">' + t('รหัสผ่าน', 'Password') + '<input id="sb_pass" type="password" placeholder="' + t('รหัสผ่าน', 'Password') + '" onkeydown="if(event.key===\'Enter\')sbLoginPass()"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbLoginPass(this)">Login</button><button class="btn" onclick="sbLogin(this)">' + t('ส่ง magic link แทน', 'Send magic link instead') + '</button></div><p class="jgt-muted" style="margin-top:12px">' + t('กรอก email + password ที่ owner สร้างให้ แล้วเข้าได้เลย', 'Enter the email + password from your owner to log in directly') + ' · ' + t('ยังไม่มีบัญชี?', 'No account?') + ' <a href="#/signup" style="text-decoration:underline">' + t('สมัครสมาชิก', 'Sign up') + '</a></p></div>');
-  // login แล้ว: สถานะ + logout, ช่อง URL/key เห็น/แก้ได้เฉพาะ owner
-  var conn = isOwner() ? '<div class="jt-form" style="margin-top:12px"><label class="full">Supabase URL<input id="sb_url" value="' + esc(SB.url) + '"></label><label class="full">Anon key<input id="sb_key" value="' + esc((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || ls.key || '') + '"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbSave()">Save & connect</button><button class="btn d" onclick="SBClear()">Disconnect</button></div>' : '';
-  return jtShell(t('บัญชี', 'Account'), '#/admin/system/supabase', '<div class="jt-panel"><p>Login: <b>' + esc(SB_USER.email) + '</b> · <span class="bd">' + esc(roleLabel()) + '</span></p><div class="jt-form" style="margin-top:12px"><label class="full">' + t('รหัสผ่านใหม่ (≥6 ตัว)', 'New password (min 6)') + '<input id="np_pass" type="password"></label></div><div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn s" onclick="sbChangePass()">' + t('เปลี่ยนรหัสผ่าน', 'Change password') + '</button><button class="btn" onclick="sbLogout()">Logout</button></div>' + conn + '</div>');
+  // login แล้ว: ข้อมูลบัญชี + สถิติ + เปลี่ยนรหัส, ช่อง URL/key เฉพาะ owner
+  var myEm = (SB_USER.email || '').toLowerCase();
+  var mine = Object.keys(ORDS).map(function (k) { return ORDS[k]; }).filter(function (o) { return ((o.cust && o.cust.email) || '').toLowerCase() === myEm; });
+  var spent = mine.reduce(function (a, o) { return a + Number(o.total || 0); }, 0);
+  var since = SB_PROFILE && SB_PROFILE.created_at ? new Date(SB_PROFILE.created_at).toLocaleDateString('en-GB') : '-';
+  var acc = '<div class="jt-panel"><div class="jt-form"><label class="full">' + t('ชื่อที่แสดง', 'Display name') + '<input id="pf_name" value="' + esc((SB_PROFILE && SB_PROFILE.display_name) || '') + '" placeholder="' + esc((SB_USER.email || '').split('@')[0]) + '"></label><label class="full">Email<input value="' + esc(SB_USER.email) + '" disabled></label></div><div style="margin-top:8px"><button class="btn s" onclick="sbSaveProfile()">' + t('บันทึกชื่อ', 'Save name') + '</button></div><div class="jt-grid" style="margin-top:12px;grid-template-columns:repeat(4,1fr)"><div class="jt-kpi"><span>' + t('บทบาท', 'Role') + '</span><b style="font-size:18px">' + esc(roleLabel()) + '</b></div><div class="jt-kpi"><span>' + t('สมาชิกตั้งแต่', 'Member since') + '</span><b style="font-size:18px">' + since + '</b></div><div class="jt-kpi"><span>' + t('ออเดอร์ของฉัน', 'My orders') + '</span><b>' + mine.length + '</b></div><div class="jt-kpi"><span>' + t('ยอดซื้อสะสม', 'Total spent') + '</span><b>' + bt(spent) + '</b></div></div><div style="margin-top:8px"><a class="btn s" href="#/account/orders">' + t('ดูออเดอร์', 'View orders') + '</a> <a class="btn s" href="#/wishlist">' + t('วิชลิสต์', 'Wishlist') + ' (' + WL.length + ')</a></div></div>';
+  var pwbox = '<div class="jt-panel"><div class="jt-form"><label class="full">' + t('รหัสผ่านใหม่ (≥6 ตัว)', 'New password (min 6)') + '<input id="np_pass" type="password"></label></div><div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn s" onclick="sbChangePass()">' + t('เปลี่ยนรหัสผ่าน', 'Change password') + '</button><button class="btn" onclick="sbLogout()">Logout</button></div></div>';
+  var conn = isOwner() ? '<div class="jt-panel"><div class="jt-form"><label class="full">Supabase URL<input id="sb_url" value="' + esc(SB.url) + '"></label><label class="full">Anon key<input id="sb_key" value="' + esc((window.JT_CONFIG && JT_CONFIG.SUPABASE_ANON_KEY) || ls.key || '') + '"></label></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn p" onclick="sbSave()">Save & connect</button><button class="btn d" onclick="SBClear()">Disconnect</button></div></div>' : '';
+  return jtShell(t('บัญชี', 'Account'), '#/admin/system/supabase', acc + pwbox + conn);
+}
+window.sbSaveProfile = async function () {
+  var c = sb(); if (!c || !SB_USER) return;
+  var v = ((document.getElementById('pf_name') || {}).value || '').trim();
+  var r = await c.from('profiles').update({ display_name: v }).eq('id', SB_USER.id);
+  if (r.error) T(r.error.message); else { if (SB_PROFILE) SB_PROFILE.display_name = v; T(t('บันทึกแล้ว', 'Saved')); go(); }
+};
 }
 window.sbChangePass = async function () {
   var c = sb(); var pw = ((document.getElementById('np_pass') || {}).value || '');
@@ -737,7 +753,7 @@ function handleAuthRedirect() {
   else if (desc) T(desc);
   try { history.replaceState(null, '', location.pathname + '#/admin/system/supabase'); } catch (e) { location.hash = '#/admin/system/supabase'; }
 }
-window.sbLogout = async function () { var c = sb(); if (c) await c.auth.signOut(); SB_USER = null; SB_ROLE = 'guest'; SB_PROFILES = []; ORDS = {}; CUSTS = []; try { localStorage.removeItem('jg_orders'); } catch (e) {} T(t('ออกจากระบบแล้ว', 'Logged out')); go(); };
+window.sbLogout = async function () { var c = sb(); if (c) await c.auth.signOut(); SB_USER = null; SB_ROLE = 'guest'; SB_PROFILES = []; SB_PROFILE = null; ORDS = {}; CUSTS = []; try { localStorage.removeItem('jg_orders'); } catch (e) {} T(t('ออกจากระบบแล้ว', 'Logged out')); go(); };
 
 /* ---------- misc views ---------- */
 function tcur() { CUR = CUR == 'THB' ? 'USD' : 'THB'; try { localStorage.setItem('jg_cur', CUR); } catch (e) {} go(); }
@@ -839,7 +855,7 @@ loadLocal(); handleAuthRedirect(); hc(); go();
     SB_USER = session ? session.user : null;
     loadRole().then(async function () {
       if (SB_USER) { try { await loadSupabase(); } catch (e) {} }
-      else { ORDS = {}; CUSTS = []; SB_ROLE = 'guest'; }
+      else { ORDS = {}; CUSTS = []; SB_ROLE = 'guest'; SB_PROFILE = null; }
       if (isStaff() && sb()) sbLoadProfilesSilent();
       go();
     });
