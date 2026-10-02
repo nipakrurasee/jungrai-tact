@@ -34,6 +34,7 @@ var H = { slides: JSON.parse(JSON.stringify(SEED_SLIDES)), secs: 7, logo: 1, wm:
 var PG = JSON.parse(JSON.stringify(DEFAULT_PAGE));
 var CART = [], DC = '', ORDS = {}, CUR = 'THB', OO = '';
 var WL = [], RV = {}, MD = []; // wishlist ids, reviews by product, media rows
+var CIM = {}; // product id -> {color: [urls]} รูปแยกตามสี
 var CUSTS = []; // customers table (staff only)
 var LANG = 'TH'; // TH | EN
 try { LANG = localStorage.getItem('jt_lang') || 'TH'; } catch (e) {}
@@ -87,8 +88,13 @@ function thb(n) { return CUR == 'USD' ? '$' + Math.round(n / 35).toLocaleString(
 function bt(n) { return '฿' + Number(n).toLocaleString('en-US'); }
 function sb() { return (window.SB && SB.configured && SB.client) ? SB.client : null; }
 function av(p) { return p.stock <= 0 ? ['so', t('หมด', 'Sold out')] : p.stock <= p.low ? ['lo', t('เหลือน้อย — เหลือ ', 'Low stock — ') + p.stock + t(' ชิ้น', ' left')] : ['', t('มีของ', 'In stock')]; }
+function swatch(c) {
+  if (CM[c]) return CM[c];
+  var h = 0; String(c || '').split('').forEach(function (x) { h = (h * 31 + x.charCodeAt(0)) % 360; });
+  return 'hsl(' + h + ',30%,40%)';
+}
 function art(p, c) {
-  var h = CM[c || p.colors[0]] || '#5a5d3a', s = '';
+  var h = swatch(c || p.colors[0]), s = '';
   if (p.cat == 'Apparel') s = '<path d="M140 70l-70 40-40 120 40 10 20-60v250h220V180l20 60 40-10-40-120-70-40c-10 25-30 38-60 38s-50-13-60-38z"/><path d="M200 108v312" fill="none"/>';
   else if (p.cat == 'Field Gear') s = '<rect x="110" y="90" width="180" height="300" rx="26"/><path d="M110 200h180M150 90V60h100v30" fill="none"/>';
   else if (p.cat == 'Accessories') s = '<path d="M60 300c0-90 60-150 140-150s140 60 140 150z"/><path d="M60 300h280l40 20H20z"/>';
@@ -100,8 +106,14 @@ function pic(p, i, c) {
   if (u && (/^(https?:|data:image|\.\/|img\/|\/)/.test(u) || /\.(jpg|jpeg|png|webp|svg|gif)(\?.*)?$/i.test(u))) return '<img src="' + u + '" alt="' + esc(p.name) + '" loading="lazy">';
   return art(p, c);
 }
+/* รูปของสีที่เลือกก่อน ถ้าไม่มีใช้รูปกลาง */
+function galImgs(p) {
+  var m = CIM[p.id] || {}, l = m[SEL.c];
+  if (l && l.length) return l;
+  return IM[p.id] || [];
+}
 function gal(p) {
-  var imgs = IM[p.id] || [], n = imgs.length;
+  var imgs = galImgs(p); GIMGS = imgs.slice(); var n = imgs.length;
   if (!n) return '<div class="gl"><div class="pn">' + art(p, SEL.c) + '</div></div>';
   if (GIDX[p.id] == null || GIDX[p.id] >= n) GIDX[p.id] = 0;
   var i = GIDX[p.id];
@@ -112,15 +124,16 @@ function gal(p) {
     (n > 1 ? '<div class="gs-ths">' + ths + '</div>' : '') + '</div>';
 }
 var GIDX = {};
+var GIMGS = [];
 function gpaint(pid) {
-  var imgs = IM[pid] || []; if (!imgs.length) return;
+  var imgs = GIMGS.length ? GIMGS : (IM[pid] || []); if (!imgs.length) return;
   var i = ((GIDX[pid] || 0) + imgs.length) % imgs.length; GIDX[pid] = i;
   var im = document.getElementById('gs-img'); if (im) im.src = imgs[i];
   var d = document.querySelectorAll('.gs-dot'), th = document.querySelectorAll('.gs-th');
   d.forEach(function (e, j) { e.classList.toggle('on', j === i); });
   th.forEach(function (e, j) { e.classList.toggle('on', j === i); });
 }
-function gnav(pid, d) { var n = (IM[pid] || []).length || 1; GIDX[pid] = (((GIDX[pid] || 0) + d) % n + n) % n; gpaint(pid); }
+function gnav(pid, d) { var n = (GIMGS.length ? GIMGS.length : (IM[pid] || []).length) || 1; GIDX[pid] = (((GIDX[pid] || 0) + d) % n + n) % n; gpaint(pid); }
 function ggo(pid, i) { GIDX[pid] = i; gpaint(pid); }
 function list() { return P.filter(function (p) { return p.status == 'active'; }); }
 function gp(id) { return P.filter(function (p) { return p.id == id; })[0]; }
@@ -134,6 +147,7 @@ function loadLocal() {
   try { var LP = JSON.parse(localStorage.getItem('jg_page')); if (LP && LP.show) PG = LP; } catch (e) {}
   try { CART = JSON.parse(localStorage.getItem('jg_cart')) || []; } catch (e) { CART = []; }
   try { WL = JSON.parse(localStorage.getItem('jt_wishlist')) || []; } catch (e) { WL = []; }
+  try { CIM = JSON.parse(localStorage.getItem('jg_cimg')) || {}; } catch (e) { CIM = {}; }
   try { ORDS = JSON.parse(localStorage.getItem('jg_orders')) || {}; } catch (e) { ORDS = {}; }
   try { CUR = localStorage.getItem('jg_cur') || 'THB'; } catch (e) {}
   if (H.logo == null) H.logo = 1; if (H.wm == null) H.wm = 1;
@@ -146,12 +160,14 @@ function fixPG() {
 /* รูปประจำสินค้า (ไฟล์ใน repo) สำหรับตัวที่ยังไม่มีรูปอัปโหลด */
 function imgFallback() {
   (P || []).forEach(function (p) {
-    if (!IM[p.id] || !IM[p.id].length) IM[p.id] = ['img/products/' + p.id + '.svg'];
+    var hasShared = IM[p.id] && IM[p.id].length, hasColor = CIM[p.id] && Object.keys(CIM[p.id]).some(function (k) { return (CIM[p.id][k] || []).length; });
+    if (!hasShared && !hasColor) IM[p.id] = ['img/products/' + p.id + '.svg'];
   });
 }
 function saveLocal() {
   try { localStorage.setItem('jg_cat', JSON.stringify(P)); } catch (e) {}
   try { localStorage.setItem('jg_img', JSON.stringify(IM)); } catch (e) { T(t('รูปใหญ่เกินเก็บในเบราว์เซอร์นี้', 'Images are too large to keep in this browser')); }
+  try { localStorage.setItem('jg_cimg', JSON.stringify(CIM)); } catch (e) {}
   try { localStorage.setItem('jg_cart', JSON.stringify(CART)); } catch (e) {}
   try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
 }
@@ -163,7 +179,7 @@ async function loadSupabase() {
       P = pr.data.map(function (r) {
         return { id: r.id, name: r.name, sku: r.sku, barcode: r.barcode || '', cat: r.category, coll: r.collection, price: r.price, compare: r.compare_at, cost: r.cost, stock: r.stock, low: r.low_threshold, status: r.status, featured: r.featured, colors: r.colors || ['Black'], sizes: r.sizes || ['One size'], tags: r.tags || '', desc: r.description || '', spec: r.spec || '', material: r.material || '', dims: r.dims || '', notes: r.notes || '' };
       });
-      IM = {}; pr.data.forEach(function (r) { if (r.image_urls && r.image_urls.length) IM[r.id] = r.image_urls; });
+      IM = {}; CIM = {}; pr.data.forEach(function (r) { if (r.image_urls && r.image_urls.length) IM[r.id] = r.image_urls; if (r.color_images && Object.keys(r.color_images).length) CIM[r.id] = r.color_images; });
       imgFallback();
     }
     var sl = await c.from('slides').select('*').order('position');
@@ -211,7 +227,7 @@ async function loadSupabase() {
 }
 async function dbUpsertProduct(o) {
   var c = sb(); if (!c) return;
-  await c.from('products').upsert({ id: o.id, name: o.name, sku: o.sku, barcode: o.barcode, category: o.cat, collection: o.coll, price: o.price, compare_at: o.compare, cost: o.cost, stock: o.stock, low_threshold: o.low, status: o.status, featured: o.featured ? 1 : 0, colors: o.colors, sizes: o.sizes, tags: o.tags, description: o.desc, spec: o.spec, material: o.material, dims: o.dims, notes: o.notes, image_urls: IM[o.id] || [] }, { onConflict: 'id' });
+  await c.from('products').upsert({ id: o.id, name: o.name, sku: o.sku, barcode: o.barcode, category: o.cat, collection: o.coll, price: o.price, compare_at: o.compare, cost: o.cost, stock: o.stock, low_threshold: o.low, status: o.status, featured: o.featured ? 1 : 0, colors: o.colors, sizes: o.sizes, tags: o.tags, description: o.desc, spec: o.spec, material: o.material, dims: o.dims, notes: o.notes, image_urls: IM[o.id] || [], color_images: CIM[o.id] || {} }, { onConflict: 'id' });
 }
 async function dbDeleteProduct(id) { var c = sb(); if (!c) return; await c.from('products').delete().eq('id', id); }
 async function dbSaveOrder(o) {
@@ -256,7 +272,7 @@ function shop() {
   return '<div class="top"><h1>' + t('คอลเลกชัน', 'Collection') + '</h1><span class="sm">' + r.length + ' ' + t('สินค้า', 'products') + (sb() ? ' · live' : ' · local') + '</span></div><div class="fl">' +
     sel('cat', t('หมวด', 'Category'), CAT.map(function (x) { return [x, x]; })) + sel('size', t('ไซส์', 'Size'), Object.keys(sizes).map(function (x) { return [x, x]; })) + sel('color', t('สี', 'Color'), Object.keys(cols).map(function (x) { return [x, x]; })) +
     sel('av', t('สถานะ', 'Availability'), [['in', t('มีของ', 'In stock')], ['out', t('หมด', 'Sold out')]]) + '<label><span class="sm">' + t('เรียง', 'Sort') + '</span><select onchange="F.sort=this.value;go()">' + [['featured', t('แนะนำ', 'Featured')], ['new', t('ใหม่สุด', 'Newest')], ['lo', t('ถูก→แพง', 'Price low-high')], ['hi', t('แพง→ถูก', 'Price high-low')]].map(function (x) { return '<option value="' + x[0] + '"' + (F.sort == x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label></div>' +
-    (r.length ? '<div class="gr">' + r.map(function (p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p.id) + '" class="pn">' + pic(p, 0) + '</a><div class="in"><h3>' + esc(p.name) + '</h3><div class="row"><span>' + thb(p.price) + (p.compare > p.price ? ' <s style="color:var(--cn)">' + thb(p.compare) + '</s>' : '') + '</span><span class="dots">' + p.colors.map(function (c) { return '<i title="' + esc(c) + '" style="background:' + (CM[c] || '#555') + '"></i>'; }).join('') + '</span></div><div class="row"><span class="av ' + a[0] + '"><b></b>' + a[1] + '</span><span style="display:inline-flex;gap:6px">' + wishBtn(p.id) + (p.stock > 0 ? '<button class="btn s" onclick="qadd(\'' + esc(p.id) + '\')">' + t('หยิบใส่ตะกร้า', 'Quick add') + '</button>' : '') + '</span></div></div></div>'; }).join('') + '</div>' : '<p>' + t('ไม่พบสินค้าตามเงื่อนไข', 'No products match these filters.') + '</p>');
+    (r.length ? '<div class="gr">' + r.map(function (p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p.id) + '" class="pn">' + pic(p, 0) + '</a><div class="in"><h3>' + esc(p.name) + '</h3><div class="row"><span>' + thb(p.price) + (p.compare > p.price ? ' <s style="color:var(--cn)">' + thb(p.compare) + '</s>' : '') + '</span><span class="dots">' + p.colors.map(function (c) { return '<i title="' + esc(c) + '" style="background:' + swatch(c) + '"></i>'; }).join('') + '</span></div><div class="row"><span class="av ' + a[0] + '"><b></b>' + a[1] + '</span><span style="display:inline-flex;gap:6px">' + wishBtn(p.id) + (p.stock > 0 ? '<button class="btn s" onclick="qadd(\'' + esc(p.id) + '\')">' + t('หยิบใส่ตะกร้า', 'Quick add') + '</button>' : '') + '</span></div></div></div>'; }).join('') + '</div>' : '<p>' + t('ไม่พบสินค้าตามเงื่อนไข', 'No products match these filters.') + '</p>');
 }
 var n = 0;
 function qadd(id) { var p = gp(id); cadd(id, p.colors[0], p.sizes[0], 1); }
@@ -288,7 +304,7 @@ function prod(id) {
   function dt(t, x, d) { return '<details><summary>' + t + '</summary><p>' + esc(x || d || 'Details will be added soon.') + '</p></details>'; }
   return '<p class="sm" style="margin-bottom:20px"><a href="#/shop">Collection</a> / ' + esc(p.cat) + '</p><div class="pp">' + gal(p) +
     '<div class="pi"><span class="sm">' + esc(p.coll) + '</span><div class="row"><h1 style="flex:1">' + esc(p.name) + '</h1>' + wishBtn(p.id) + '</div><div class="price">' + thb(p.price) + (p.compare > p.price ? '<s>' + thb(p.compare) + '</s>' : '') + '</div><p style="color:#b9b8ae">' + esc(p.desc) + '</p>' +
-    '<div><span class="sm">' + t('สี', 'Color') + ' — ' + esc(SEL.c) + '</span><div class="opt">' + p.colors.map(function (c) { return '<button class="sw" aria-label="' + esc(c) + '" aria-pressed="' + (c == SEL.c) + '" onclick="SEL.c=\'' + esc(c) + '\';go()"><i style="background:' + (CM[c] || '#555') + '"></i></button>'; }).join('') + '</div></div>' +
+    '<div><span class="sm">' + t('สี', 'Color') + ' — ' + esc(SEL.c) + '</span><div class="opt">' + p.colors.map(function (c) { return '<button class="sw" aria-label="' + esc(c) + '" aria-pressed="' + (c == SEL.c) + '" onclick="SEL.c=\'' + esc(c) + '\';GIDX[\'' + esc(p.id) + '\']=0;go()"><i style="background:' + swatch(c) + '"></i></button>'; }).join('') + '</div></div>' +
     '<div><span class="sm">' + t('ไซส์', 'Size') + '</span><div class="opt">' + p.sizes.map(function (s) { return '<button aria-pressed="' + (s == SEL.s) + '" onclick="SEL.s=\'' + esc(s) + '\';go()">' + esc(s) + '</button>'; }).join('') + '</div></div>' +
     '<div class="av ' + a[0] + '"><b></b>' + a[1] + '</div><div class="qty"><button aria-label="Less" onclick="Q=Math.max(1,Q-1);go()">–</button><span>' + Q + '</span><button aria-label="More" onclick="Q++;go()">+</button></div>' +
     (p.stock > 0 ? '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn p" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ')">' + t('หยิบใส่ตะกร้า', 'Add to cart') + '</button><button class="btn" onclick="cadd(\'' + esc(p.id) + '\',SEL.c,SEL.s,' + Q + ',1);location.hash=\'#/checkout\'">' + t('ซื้อเลย', 'Buy now') + '</button></div>' : '<button class="btn" disabled style="opacity:.5">' + t('หมด', 'Sold out') + '</button>') +
@@ -449,7 +465,9 @@ function admin() {
     var open = PO === p.id;
     h += '<tr style="cursor:pointer" onclick="PO=PO===\'' + p.id + '\'?\'\':\'' + p.id + '\';go()"><td>' + esc(p.name) + (p.featured ? ' <span class="sm">★</span>' : '') + '</td><td>' + esc(p.sku) + '</td><td>' + thb(p.price) + '</td><td' + (p.stock <= p.low ? ' style="color:var(--sd)"' : '') + '>' + p.stock + '</td><td><span class="bd ' + p.status + '">' + p.status + '</span></td><td style="text-align:right;white-space:nowrap"><button class="btn s" onclick="event.stopPropagation();edit(' + i + ')">' + (myRole() === 'shop_admin' ? t('สต็อก', 'Stock') : t('แก้', 'Edit')) + '</button>' + (isStaff() ? ' <button class="btn s" onclick="event.stopPropagation();arch(' + i + ')">' + (p.status == 'archived' ? t('กู้คืน', 'Restore') : t('เก็บ', 'Archive')) + '</button>' : '') + (isOwner() ? ' <button class="btn s d" onclick="event.stopPropagation();del(' + i + ')">' + t('ลบ', 'Delete') + '</button>' : '') + '</td></tr>';
     if (open) {
-      var imgs = (IM[p.id] || []).map(function (u) { return '<a href="' + u + '" target="_blank" style="width:72px;height:90px;display:inline-block;border:1px solid var(--ln);overflow:hidden"><img src="' + u + '" alt="" style="width:100%;height:100%;object-fit:cover"></a>'; }).join('');
+      var allImgs = (IM[p.id] || []).map(function (u) { return { u: u, c: '' }; });
+      Object.keys(CIM[p.id] || {}).forEach(function (col) { (CIM[p.id][col] || []).forEach(function (u) { allImgs.push({ u: u, c: col }); }); });
+      var imgs = allImgs.map(function (e) { return '<a href="' + e.u + '" target="_blank" style="width:72px;height:90px;display:inline-block;border:1px solid var(--ln);overflow:hidden;position:relative"><img src="' + e.u + '" alt="" style="width:100%;height:100%;object-fit:cover">' + (e.c ? '<span class="sm" style="position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);text-align:center">' + esc(e.c) + '</span>' : '') + '</a>'; }).join('');
       var kv = function (k, v) { return (v === '' || v == null || (Array.isArray(v) && !v.length)) ? '' : '<div><b>' + k + '</b><br>' + esc(Array.isArray(v) ? v.join(', ') : v) + '</div>'; };
       h += '<tr><td colspan="6" style="text-align:left"><div class="fm" style="margin:0;border:0;padding:8px 0;grid-template-columns:repeat(4,1fr)">' + (imgs ? '<div class="w4" style="display:flex;gap:8px;flex-wrap:wrap">' + imgs + '</div>' : '') +
         '<div class="w4" style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn s" href="#/p/' + esc(p.id) + '">' + t('ดูหน้าร้าน', 'View storefront') + '</a></div>' +
@@ -470,7 +488,7 @@ function form() {
     fld('price', 'Price (THB)', 'number') + fld('compare', 'Compare-at', 'number') + fld('cost', 'Cost', 'number') + fld('stock', 'Stock', 'number') + fld('low', 'Low threshold', 'number') +
     fld('colors', 'Colors (comma)', '', 'w2') + fld('sizes', 'Sizes (comma)', '', 'w2') + fld('tags', 'Tags', '', 'w4') + fld('desc', 'Short description', 'ta', 'w4') + fld('spec', 'Specifications', 'ta', 'w2') + fld('material', 'Material', 'ta', 'w2') + fld('dims', 'Dimensions', 'ta', 'w2') + fld('notes', 'Field notes', 'ta', 'w2') + imgui() + '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">' + t('บันทึกสินค้า', 'Save product') + '</button><button class="btn" onclick="E=null;go()">' + t('ยกเลิก', 'Cancel') + '</button></div></div>';
 }
-function edit(i) { E = i < 0 ? mk('new-' + Date.now().toString(36), '', 'Apparel', 'Core', 0, 0, 0, 0, ['Black'], ['One size'], 0, '') : JSON.parse(JSON.stringify(P[i])); E._i = i; EI = (IM[E.id] || []).slice(); if (i < 0) { E.status = 'draft'; E.sku = ''; } go(); var f = $('#fm'); f && f.scrollIntoView({ behavior: 'smooth' }); }
+function edit(i) { E = i < 0 ? mk('new-' + Date.now().toString(36), '', 'Apparel', 'Core', 0, 0, 0, 0, ['Black'], ['One size'], 0, '') : JSON.parse(JSON.stringify(P[i])); E._i = i; EI = (IM[E.id] || []).map(function (u) { return { u: u, c: '' }; }); Object.keys(CIM[E.id] || {}).forEach(function (col) { (CIM[E.id][col] || []).forEach(function (u) { EI.push({ u: u, c: col }); }); }); if (i < 0) { E.status = 'draft'; E.sku = ''; } go(); var f = $('#fm'); f && f.scrollIntoView({ behavior: 'smooth' }); }
 async function commit() {
   if (!isStaff()) { T('ต้อง login เป็น staff'); return; }
   if (!isOwner() && myRole() === 'shop_admin' && arguments.length === 0) { /* stock-only enforced below */ }
@@ -486,18 +504,28 @@ async function commit() {
   }
   if (i < 0 && myRole() === 'shop_admin') { T('สร้างสินค้าได้เฉพาะ owner'); return; }
   if (i < 0) P.push(o); else { o.id = P[i].id; P[i] = o; }
-  IM[o.id] = EI.slice(0, 4);
+  IM[o.id] = EI.filter(function (e) { return !e.c; }).map(function (e) { return e.u; }).slice(0, 4);
+  CIM[o.id] = {}; EI.filter(function (e) { return e.c; }).forEach(function (e) { (CIM[o.id][e.c] = CIM[o.id][e.c] || []).push(e.u); });
+  if (!Object.keys(CIM[o.id]).length) delete CIM[o.id];
   saveLocal(); await dbUpsertProduct(o);
   E = null; T(t('บันทึกแล้ว', 'Saved')); go();
 }
 async function arch(i) { if (!isStaff()) { T('ต้อง login เป็น staff'); return; } P[i].status = P[i].status == 'archived' ? 'draft' : 'archived'; saveLocal(); await dbUpsertProduct(P[i]); go(); }
-async function del(i) { if (!isOwner()) { T('ลบสินค้าได้เฉพาะ owner'); return; } if (!confirm(t('ลบ "', 'Delete "') + P[i].name + '"?')) return; var id = P[i].id; P.splice(i, 1); delete IM[id]; saveLocal(); await dbDeleteProduct(id); go(); }
+async function del(i) { if (!isOwner()) { T('ลบสินค้าได้เฉพาะ owner'); return; } if (!confirm(t('ลบ "', 'Delete "') + P[i].name + '"?')) return;   var id = P[i].id; P.splice(i, 1); delete IM[id]; delete CIM[id]; saveLocal(); await dbDeleteProduct(id); go(); }
 
 /* ---------- images (Storage-first) ---------- */
 function sync() { document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k; E[k] = k == 'featured' ? (e.value == '1' ? 1 : 0) : e.value; }); }
 function redraw() { var y = scrollY; go(); scrollTo(0, y); }
+function ecols() {
+  var v = E.colors;
+  if (Array.isArray(v)) return v.filter(Boolean);
+  return String(v || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+}
+function eiset(i, v) { sync(); EI[i].c = v; redraw(); }
 function imgui() {
-  return '<div class="w4"><span>' + t('รูปสินค้า', 'Product images') + ' (' + EI.length + '/4)' + (sb() ? ' · Supabase Storage' : ' · local') + '</span><div class="im" style="margin-top:8px">' + EI.map(function (s, i) { return '<div><div class="pn"><img src="' + s + '" alt=""></div><div style="display:flex;gap:6px"><button class="btn s" onclick="imv(' + i + ')"' + (i ? '' : ' disabled') + '>' + t('ตั้งเป็นปก', 'Make first') + '</button><button class="btn s d" onclick="irm(' + i + ')">' + t('ลบ', 'Remove') + '</button></div></div>'; }).join('') + '</div>' + (EI.length < 4 ? '<button class="btn s" style="margin-top:10px" onclick="document.getElementById(\'fi\').click()">' + t('อัปโหลดรูป', 'Upload images') + '</button> <button class="btn s" style="margin-top:10px" onclick="pickProductImg()">' + t('จากคลัง', 'Library') + '</button><input id="fi" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onchange="iup(this.files)">' : '') + '<p style="font-size:12px">JPG/PNG/WebP ' + t('สูงสุด 4 รูป รูปแรกคือปก ย่อเหลือ 1000px อัตโนมัติ', 'up to 4 images, first is cover, auto-resized to 1000px') + (sb() ? t(' อัปโหลดเข้า Storage bucket product-images', ' · uploads to product-images bucket') : '') + '</p></div>';
+  var cols = ecols();
+  function cosel(s, i) { return '<select onchange="eiset(' + i + ',this.value)" style="margin-top:6px;width:100%"><option value="">' + t('ทุกสี', 'All colors') + '</option>' + cols.map(function (c) { return '<option value="' + esc(c) + '"' + (s.c === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>'; }
+  return '<div class="w4"><span>' + t('รูปสินค้า', 'Product images') + ' (' + EI.length + '/4)' + (sb() ? ' · Supabase Storage' : ' · local') + '</span><div class="im" style="margin-top:8px">' + EI.map(function (s, i) { return '<div><div class="pn"><img src="' + s.u + '" alt=""></div>' + cosel(s, i) + '<div style="display:flex;gap:6px;margin-top:6px"><button class="btn s" onclick="imv(' + i + ')"' + (i ? '' : ' disabled') + '>' + t('ตั้งเป็นปก', 'Make first') + '</button><button class="btn s d" onclick="irm(' + i + ')">' + t('ลบ', 'Remove') + '</button></div></div>'; }).join('') + '</div>' + (EI.length < 4 ? '<button class="btn s" style="margin-top:10px" onclick="document.getElementById(\'fi\').click()">' + t('อัปโหลดรูป', 'Upload images') + '</button> <button class="btn s" style="margin-top:10px" onclick="pickProductImg()">' + t('จากคลัง', 'Library') + '</button><input id="fi" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onchange="iup(this.files)">' : '') + '<p style="font-size:12px">' + t('เลือกรูปแล้วระบุสีของรูปนั้น ถ้าเลือก "ทุกสี" รูปจะโชว์ทุกสี', 'Tag each image with its color, or All colors to show for every color') + '</p></div>';
 }
 function imv(i) { sync(); EI.unshift(EI.splice(i, 1)[0]); redraw(); }
 function irm(i) { sync(); EI.splice(i, 1); redraw(); }
@@ -520,9 +548,9 @@ async function iup(fs) {
     if (c && E && E.id) {
       var path = E.id + '/' + Date.now().toString(36) + '-' + j + '.jpg';
       var up = await c.storage.from('product-images').upload(path, r.blob, { contentType: 'image/jpeg', upsert: true });
-      if (up.error) { T(t('อัปโหลดไม่สำเร็จ เก็บแบบ local', 'Upload failed, kept locally')); EI.push(r.dataUrl); }
-      else { var pub = c.storage.from('product-images').getPublicUrl(path); EI.push(pub.data.publicUrl); }
-    } else EI.push(r.dataUrl);
+      if (up.error) { T(t('อัปโหลดไม่สำเร็จ เก็บแบบ local', 'Upload failed, kept locally')); EI.push({u:r.dataUrl,c:''}); }
+      else { var pub = c.storage.from('product-images').getPublicUrl(path); EI.push({u:pub.data.publicUrl,c:''}); }
+    } else EI.push({u:r.dataUrl,c:''});
   }
   redraw();
 }
@@ -574,7 +602,7 @@ function openMediaPicker(cb) {
 }
 function closeMediaPicker() { mediaCb = null; var ov = document.getElementById('md-picker'); if (ov) ov.remove(); }
 function pickMedia(i) { var m = MD[i]; if (m && mediaCb) { var cb = mediaCb; closeMediaPicker(); cb(m.url); } }
-function pickProductImg() { sync(); if (EI.length >= 4) { T(t('ได้สูงสุด 4 รูป', 'Max 4 images')); return; } openMediaPicker(function (url) { EI.push(url); redraw(); }); }
+function pickProductImg() { sync(); if (EI.length >= 4) { T(t('ได้สูงสุด 4 รูป', 'Max 4 images')); return; } openMediaPicker(function (url) { EI.push({u:url,c:''}); redraw(); }); }
 function pickSlideImg(i) { openMediaPicker(function (url) { HS.slides[i].img = url; redraw(); }); }
 
 /* ---------- admin: homepage / sections ---------- */
