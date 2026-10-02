@@ -154,7 +154,7 @@ async function loadSupabase() {
     var se = await c.auth.getSession(); SB_USER = se.data.session ? se.data.session.user : null;
     await loadRole();
     // กันเห็นออเดอร์ข้าม user: login แล้วใช้ข้อมูล server ของตัวเองเท่านั้น
-    if (SB_USER) { ORDS = {}; CUSTS = []; await claimGuestOrders(); }
+    if (SB_USER) { ORDS = {}; CUSTS = []; await claimGuestOrders(); await applyPendingProfile(); }
     var od;
     if (!SB_USER) od = { data: [] };
     else if (isStaff()) od = await c.from('orders').select('*').order('created_at', { ascending: false }).limit(200);
@@ -198,7 +198,23 @@ async function dbSaveOrder(o) {
   await c.from('orders').insert({ order_no: o.no, customer: o.cust, address: o.addr, items: o.items, subtotal: o.sub, discount: o.d, shipping: o.ship, total: o.total, discount_code: o.code, payment_method: o.pay, status: o.status, tracking: o.track, note: o.note, stock_deducted: o.stockDone, log: o.log, user_id: (SB_USER && SB_USER.id) || null, customer_email: ((o.cust && o.cust.email) || '').toLowerCase() });
 }
 async function dbUpdateOrder(no, patch) { var c = sb(); if (!c) return; await c.from('orders').update(patch).eq('order_no', no); }
-/* เคลมออเดอร์ที่สั่งตอน guest (อีเมลเดียวกัน) มาผูกกับ user หลัง login */
+/* เอารายละเอียดที่กรอกตอนสมัคร (ค้างกรณีต้องยืนยันอีเมลก่อน) เข้าบัญชีหลัง login ครั้งแรก */
+async function applyPendingProfile() {
+  var c = sb(); if (!c || !SB_USER) return;
+  var pend = null;
+  try { pend = JSON.parse(localStorage.getItem('jt_pending_profile') || 'null'); } catch (e) {}
+  if (!pend || (pend.email && pend.email !== String(SB_USER.email || '').toLowerCase())) return;
+  try {
+    var cur = SB_PROFILE || {};
+    var patch = {};
+    if (!cur.full_name && pend.det.full_name) patch.full_name = pend.det.full_name;
+    if (!cur.phone && pend.det.phone) patch.phone = pend.det.phone;
+    var ca = cur.address || {};
+    if (!ca.line && pend.det.address && pend.det.address.line) patch.address = pend.det.address;
+    if (Object.keys(patch).length) { await c.from('profiles').update(patch).eq('id', SB_USER.id); await loadRole(); }
+    try { localStorage.removeItem('jt_pending_profile'); } catch (e) {}
+  } catch (e) {}
+}
 async function claimGuestOrders() {
   var c = sb(); if (!c || !SB_USER || !SB_USER.email) return;
   try { await c.from('orders').update({ user_id: SB_USER.id }).is('user_id', null).eq('customer_email', String(SB_USER.email).toLowerCase()); } catch (e) {}
@@ -338,9 +354,12 @@ function checkoutView() {
   if (!CART.length) return '<div class="top"><h1>' + t('ชำระเงิน', 'Checkout') + '</h1></div><p>' + t('ตะกร้าว่าง', 'Your cart is empty.') + '</p>';
   function f(id, l, ph, c, t, ac, v) { return '<label class="' + (c || '') + '">' + l + '<input id="' + id + '" type="' + (t || 'text') + '" placeholder="' + ph + '" value="' + esc(v || '') + '" autocomplete="' + (ac || 'off') + '"></label>'; }
   var ad0 = (SB_USER ? myAddr() : { name: '', phone: '', line: '', sub: '', dist: '', prov: '', zip: '' });
+  var lastA = lastOrderAddr();
+  if (lastA && lastA.line) ad0 = lastA; // ออเดอร์ล่าสุดก่อนที่อยู่บัญชี
+  var fromLast = !!(lastA && lastA.line);
   var pays = [['promptpay', 'PromptPay', 'Scan QR จากแอปธนาคารหลังสั่งซื้อ'], ['card', 'Credit / debit card', 'จ่ายผ่าน payment provider'], ['bank', 'Bank transfer', 'โอนแล้วแนบสลิป']];
   var items = CART.map(function (l) { var p = gp(l.id); return p ? '<div class="row"><span>' + esc(p.name) + ' <span class="sm">' + esc(l.c) + ' / ' + esc(l.s) + ' × ' + l.qty + '</span></span><span>' + thb(p.price * l.qty) + '</span></div>' : ''; }).join('');
-  return '<div class="top"><h1>' + t('ชำระเงิน', 'Checkout') + '</h1><a class="sm" href="#/cart">' + t('กลับไปตะกร้า', 'Back to cart') + '</a></div>' + (SB_USER && ad0.line ? '<p class="sm">' + t('ดึงที่อยู่จากบัญชีให้แล้ว — แก้ได้ตรงนี้', 'Address filled from your account — editable here') + '</p>' : '') + '<div class="ck"><div><div class="fm" style="grid-template-columns:1fr 1fr">' + f('em', 'Email', 'name@example.com', 'w2', 'email', 'email', SB_USER ? SB_USER.email : '') + f('nm', t('ชื่อ-นามสกุล', 'Full name'), 'ชื่อ-นามสกุล', 'w2', 'text', '', ad0.name) + f('ph', t('โทรศัพท์', 'Phone'), '081 234 5678', 'w2', 'tel', 'tel', ad0.phone) + f('ad', t('ที่อยู่', 'Address'), 'บ้านเลขที่ หมู่ ซอย ถนน', 'w2', 'text', 'street-address', ad0.line) + f('sd', t('แขวง/ตำบล', 'Subdistrict'), '', '', 'text', '', ad0.sub) + f('ds', t('เขต/อำเภอ', 'District'), '', '', 'text', '', ad0.dist) +
+  return '<div class="top"><h1>' + t('ชำระเงิน', 'Checkout') + '</h1><a class="sm" href="#/cart">' + t('กลับไปตะกร้า', 'Back to cart') + '</a></div>' + (SB_USER && ad0.line ? '<p class="sm">' + (fromLast ? t('ดึงที่อยู่จากออเดอร์ล่าสุดให้แล้ว', 'Address filled from your latest order') + ' (' + esc(lastA.no) + ')' : t('ดึงที่อยู่จากบัญชีให้แล้ว', 'Address filled from your account')) + t(' — แก้ได้ตรงนี้', ' — editable here') + '</p>' : '') + '<div class="ck"><div><div class="fm" style="grid-template-columns:1fr 1fr">' + f('em', 'Email', 'name@example.com', 'w2', 'email', 'email', SB_USER ? SB_USER.email : '') + f('nm', t('ชื่อ-นามสกุล', 'Full name'), 'ชื่อ-นามสกุล', 'w2', 'text', '', ad0.name) + f('ph', t('โทรศัพท์', 'Phone'), '081 234 5678', 'w2', 'tel', 'tel', ad0.phone) + f('ad', t('ที่อยู่', 'Address'), 'บ้านเลขที่ หมู่ ซอย ถนน', 'w2', 'text', 'street-address', ad0.line) + f('sd', t('แขวง/ตำบล', 'Subdistrict'), '', '', 'text', '', ad0.sub) + f('ds', t('เขต/อำเภอ', 'District'), '', '', 'text', '', ad0.dist) +
     '<label>' + t('จังหวัด', 'Province') + '<input id="pv" list="pvl" placeholder="' + t('เลือกหรือพิมพ์จังหวัด', 'Select province') + '" value="' + esc(ad0.prov) + '"></label><datalist id="pvl">' + PROV.map(function (p) { return '<option value="' + p + '">'; }).join('') + '</datalist>' + f('zp', t('รหัสไปรษณีย์', 'Postcode'), '10110', '', 'text', 'postal-code', ad0.zip) + '</div>' +
     '<h3 style="font-size:28px;margin:28px 0 12px">' + t('ชำระเงิน', 'Payment') + '</h3><div style="display:grid;gap:10px">' + pays.map(function (a, i) { return '<label class="pay"><input type="radio" name="pay" value="' + a[0] + '"' + (i ? '' : ' checked') + '><span><b>' + a[1] + '</b><br>' + a[2] + '</span></label>'; }).join('') + '</div></div>' +
     '<div class="fm" style="grid-template-columns:1fr;position:sticky;top:80px"><h3 style="font-size:28px">' + t('สรุปคำสั่งซื้อ', 'Order summary') + '</h3>' + items + sumbox(calc(), 0) + '<button class="btn p" onclick="place()">' + t('สั่งซื้อ', 'Place order') + '</button></div></div>';
@@ -720,6 +739,17 @@ function myAddr() {
   var a = (SB_PROFILE && SB_PROFILE.address) || {};
   return { name: (SB_PROFILE && SB_PROFILE.full_name) || '', phone: (SB_PROFILE && SB_PROFILE.phone) || '', line: a.line || '', sub: a.sub || '', dist: a.dist || '', prov: a.prov || '', zip: a.zip || '' };
 }
+/* ที่อยู่ออเดอร์ล่าสุดของตัวเอง (มีก่อนที่อยู่บัญชี) */
+function lastOrderAddr() {
+  if (!SB_USER) return null;
+  var myEm = (SB_USER.email || '').toLowerCase();
+  var L = Object.keys(ORDS).map(function (k) { return ORDS[k]; })
+    .filter(function (o) { return ((o.cust && o.cust.email) || '').toLowerCase() === myEm; })
+    .sort(function (a, b) { return a.at < b.at ? 1 : -1; });
+  if (!L.length) return null;
+  var o = L[0];
+  return { name: (o.cust && o.cust.name) || '', phone: (o.cust && o.cust.phone) || '', line: (o.addr && o.addr.line) || '', sub: (o.addr && o.addr.sub) || '', dist: (o.addr && o.addr.dist) || '', prov: (o.addr && o.addr.prov) || '', zip: (o.addr && o.addr.zip) || '', no: o.no };
+}
 window.sbSaveAddress = async function () {
   var c = sb(); if (!c) { T(t('ยังไม่ต่อ Supabase', 'Not connected')); return; }
   if (!SB_USER) { T(t('กรุณา login ก่อน', 'Please log in first')); return; }
@@ -808,7 +838,7 @@ function lockBtn(b, lock) { try { if (b) { b.disabled = !!lock; } } catch (e) {}
 /* ---------- public signup (member) ---------- */
 function signupView() {
   if (SB_USER) { location.hash = isStaff() ? '#/admin/dashboard' : '#/account/orders'; return '<p>...</p>'; }
-  return '<div class="jt-panel" style="max-width:520px;margin:24px auto"><h1 style="font-size:40px">' + t('สมัครสมาชิก', 'Sign up') + '</h1><div class="jt-form"><label class="full">Email<input id="su_email" type="email" placeholder="you@example.com"></label><label class="full">' + t('รหัสผ่าน (อย่างน้อย 6 ตัว)', 'Password (min 6 chars)') + '<input id="su_pass" type="password"></label><label class="full">' + t('ยืนยันรหัสผ่าน', 'Confirm password') + '<input id="su_pass2" type="password" onkeydown="if(event.key===\'Enter\')sbSignup()"></label></div><div style="margin-top:12px"><button class="btn p" onclick="sbSignup(this)">' + t('สมัครสมาชิก', 'Sign up') + '</button></div><p class="jgt-muted" style="margin-top:12px">' + t('มีบัญชีแล้ว?', 'Have an account?') + ' <a href="#/admin/system/supabase" style="text-decoration:underline">Login</a></p></div>';
+  return '<div class="jt-panel" style="max-width:520px;margin:24px auto"><h1 style="font-size:40px">' + t('สมัครสมาชิก', 'Sign up') + '</h1><div class="jt-form"><label class="full">Email<input id="su_email" type="email" placeholder="you@example.com"></label><label class="full">' + t('รหัสผ่าน (อย่างน้อย 6 ตัว)', 'Password (min 6 chars)') + '<input id="su_pass" type="password"></label><label class="full">' + t('ยืนยันรหัสผ่าน', 'Confirm password') + '<input id="su_pass2" type="password"></label><label class="full">' + t('ชื่อ-นามสกุล', 'Full name') + '<input id="su_nm"></label><label class="full">' + t('โทรศัพท์', 'Phone') + '<input id="su_ph" placeholder="081 234 5678"></label><label class="full">' + t('ที่อยู่จัดส่ง', 'Shipping address') + '<input id="su_ad" placeholder="' + t('บ้านเลขที่ หมู่ ซอย ถนน', 'Street') + '"></label><label>' + t('แขวง/ตำบล', 'Subdistrict') + '<input id="su_sd"></label><label>' + t('เขต/อำเภอ', 'District') + '<input id="su_ds"></label><label>' + t('จังหวัด', 'Province') + '<input id="su_pv" list="su_pvl"></label><datalist id="su_pvl">' + PROV.map(function (p) { return '<option value="' + p + '">'; }).join('') + '</datalist><label>' + t('รหัสไปรษณีย์', 'Postcode') + '<input id="su_zp" onkeydown="if(event.key===\'Enter\')sbSignup()"></label></div><div style="margin-top:12px"><button class="btn p" onclick="sbSignup(this)">' + t('สมัครสมาชิก', 'Sign up') + '</button></div><p class="jgt-muted" style="margin-top:12px">' + t('มีบัญชีแล้ว?', 'Have an account?') + ' <a href="#/admin/system/supabase" style="text-decoration:underline">Login</a></p></div>';
 }
 window.sbSignup = async function (btn) {
   var c = sb(); if (!c) { T(t('ยังไม่ต่อ Supabase', 'Not connected')); return; }
@@ -821,11 +851,16 @@ window.sbSignup = async function (btn) {
   var r = await c.auth.signUp({ email: em, password: p1 });
   lockBtn(btn, false);
   if (r.error) { T(authErr(r.error.message)); return; }
+  var det = { full_name: ((document.getElementById('su_nm') || {}).value || '').trim(), phone: ((document.getElementById('su_ph') || {}).value || '').trim(), address: { line: ((document.getElementById('su_ad') || {}).value || '').trim(), sub: ((document.getElementById('su_sd') || {}).value || '').trim(), dist: ((document.getElementById('su_ds') || {}).value || '').trim(), prov: ((document.getElementById('su_pv') || {}).value || '').trim(), zip: ((document.getElementById('su_zp') || {}).value || '').trim() } };
   if (r.data.session) {
     SB_USER = r.data.session.user; await loadRole();
+    try { await c.from('profiles').update(det).eq('id', SB_USER.id); await loadRole(); } catch (e) {}
     T(t('สมัครสำเร็จ ยินดีต้อนรับ', 'Welcome! Signed up'));
     location.hash = '#/account'; go();
-  } else T(t('สมัครแล้ว — เช็กอีเมลเพื่อยืนยันก่อน login', 'Signed up — check your email to confirm, then log in'));
+  } else {
+    try { localStorage.setItem('jt_pending_profile', JSON.stringify({ email: em.toLowerCase(), det: det })); } catch (e) {}
+    T(t('สมัครแล้ว — เช็กอีเมลเพื่อยืนยัน รายละเอียดที่อยู่จะเข้าบัญชีหลัง login ครั้งแรก', 'Signed up — confirm via email; your address will attach on first login'));
+  }
 };
 
 /* ---------- account: my orders (member) ---------- */
