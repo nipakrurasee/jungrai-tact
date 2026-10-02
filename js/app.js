@@ -51,7 +51,7 @@ function applyHeader() {
   if (lg) {
     if (!sb() || !SB_USER) { lg.textContent = t('เข้าสู่ระบบ', 'LOGIN'); lg.href = '#/admin/system/supabase'; }
     else if (isStaff()) { lg.textContent = t('หลังร้าน', 'ADMIN'); lg.href = '#/admin/dashboard'; }
-    else { lg.textContent = t('บัญชีของฉัน', 'ACCOUNT'); lg.href = '#/account/orders'; }
+    else { lg.textContent = t('บัญชีของฉัน', 'ACCOUNT'); lg.href = '#/account'; }
   }
 }
 var STS = ['new', 'paid', 'processing', 'packed', 'shipped', 'delivered', 'cancelled', 'refunded'];
@@ -605,6 +605,7 @@ async function oset(no, k, v) { if (!isStaff()) { T('ต้อง login เป�
 /* ---------- admin shell ---------- */
 function jtNav(active) {
   var store = [[t('หน้าแรก', 'Home'), '#/'], [t('ร้านค้า', 'Shop'), '#/shop'], [t('สินค้า', 'Product'), '#/product'], [t('ตะกร้า', 'Cart'), '#/cart'], [t('ชำระเงิน', 'Checkout'), '#/checkout'], [t('วิชลิสต์', 'Wishlist'), '#/wishlist'], [t('สำเร็จ', 'Order Complete'), '#/order-complete']];
+  if (SB_USER) store.push([t('บัญชีของฉัน', 'My Account'), '#/account']);
   if (SB_USER) store.push([t('ออเดอร์ของฉัน', 'My Orders'), '#/account/orders']);
   else store.push([t('สมัครสมาชิก', 'Sign up'), '#/signup']);
   var groups = [[t('ร้าน', 'STORE'), store]];
@@ -732,7 +733,7 @@ window.sbLoginPass = async function (btn) {
   SB_USER = r.data.user; await loadRole();
   if (isStaff()) await sbLoadProfilesSilent();
   T('ยินดีต้อนรับ ' + em);
-  location.hash = isStaff() ? '#/admin/dashboard' : '#/account/orders'; go();
+  location.hash = isStaff() ? '#/admin/dashboard' : '#/account'; go();
 };
 window.sbLogin = async function (btn) {
   var c = sb(); if (!c) { T('ต่อ Supabase ก่อน'); return; }
@@ -789,7 +790,7 @@ window.sbSignup = async function (btn) {
   if (r.data.session) {
     SB_USER = r.data.session.user; await loadRole();
     T(t('สมัครสำเร็จ ยินดีต้อนรับ', 'Welcome! Signed up'));
-    location.hash = '#/account/orders'; go();
+    location.hash = '#/account'; go();
   } else T(t('สมัครแล้ว — เช็กอีเมลเพื่อยืนยันก่อน login', 'Signed up — check your email to confirm, then log in'));
 };
 
@@ -815,6 +816,7 @@ function go() {
   document.querySelector('main').className = isH ? 'h' : '';
   var v;
   if (h === '#/account/orders') v = myOrdersView();
+  else if (h === '#/account') v = jtSupabase();
   else if (h === '#/signup') v = signupView();
   else if (h === '#/admin' || h === '#/admin/dashboard') v = isStaff() ? jtDashboard() : deny('Staff only');
   else if (h === '#/admin/products') v = isStaff() ? jtShell(t('สินค้า', 'Products'), '#/admin/products', admin()) : deny('Staff only');
