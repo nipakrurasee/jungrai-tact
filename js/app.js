@@ -571,6 +571,7 @@ async function commit() {
   if (!Array.isArray(o.colors)) o.colors = []; if (!Array.isArray(o.sizes)) o.sizes = [];
   var vsInputs = document.querySelectorAll('#fm [data-vs]');
   var vsm = {}; vsInputs.forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) vsm[e.getAttribute('data-vs')] = v; });
+  if (vsInputs.length && !Object.keys(vsm).length) { T(t('กรุณากรอกสต็อกแยกชุดอย่างน้อย 1 ช่อง (ยอดรวมคำนวณเอง)', 'Fill at least one variant stock — total is auto-calculated')); return; }
   o.vstock = vsm;
   // ตัดคีย์เก่าที่สี/ไซส์ไม่อยู่ในรายการแล้ว (กันคีย์ค้างทำให้ซื้อไม่ได้)
   var okCols = {}, okVs = {};
