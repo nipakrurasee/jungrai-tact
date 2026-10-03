@@ -411,12 +411,15 @@ function checkoutView() {
   var ad0 = (SB_USER ? myAddr() : { name: '', phone: '', line: '', sub: '', dist: '', prov: '', zip: '' });
   var lastA = lastOrderAddr();
   if (lastA && lastA.line) ad0 = lastA; // ออเดอร์ล่าสุดก่อนที่อยู่บัญชี
+  var st = checkoutStash() || {};
+  ['name', 'phone', 'line', 'sub', 'dist', 'prov', 'zip'].forEach(function (k, ix) { var v = [st.nm, st.ph, st.ad, st.sd, st.ds, st.pv, st.zp][ix]; if (v != null) ad0[k] = v; });
+  var stEm = st.em != null ? st.em : (SB_USER ? SB_USER.email : '');
   var fromLast = !!(lastA && lastA.line);
   var pays = [['promptpay', 'PromptPay', 'Scan QR จากแอปธนาคารหลังสั่งซื้อ'], ['card', 'Credit / debit card', 'จ่ายผ่าน payment provider'], ['bank', 'Bank transfer', 'โอนแล้วแนบสลิป']];
   var items = CART.map(function (l) { var p = gp(l.id); return p ? '<div class="row"><span>' + esc(p.name) + ' <span class="sm">' + esc(l.c) + ' / ' + esc(l.s) + ' × ' + l.qty + '</span></span><span>' + thb(p.price * l.qty) + '</span></div>' : ''; }).join('');
-  return '<div class="top"><h1>' + t('ชำระเงิน', 'Checkout') + '</h1><a class="sm" href="#/cart">' + t('กลับไปตะกร้า', 'Back to cart') + '</a></div>' + (SB_USER && ad0.line ? '<p class="sm">' + (fromLast ? t('ดึงที่อยู่จากออเดอร์ล่าสุดให้แล้ว', 'Address filled from your latest order') + ' (' + esc(lastA.no) + ')' : t('ดึงที่อยู่จากบัญชีให้แล้ว', 'Address filled from your account')) + t(' — แก้ได้ตรงนี้', ' — editable here') + '</p>' : '') + '<div class="ck"><div><div class="fm" style="grid-template-columns:1fr 1fr">' + f('em', 'Email', 'name@example.com', 'w2', 'email', 'email', SB_USER ? SB_USER.email : '') + f('nm', t('ชื่อ-นามสกุล', 'Full name'), 'ชื่อ-นามสกุล', 'w2', 'text', '', ad0.name) + f('ph', t('โทรศัพท์', 'Phone'), '081 234 5678', 'w2', 'tel', 'tel', ad0.phone) + f('ad', t('ที่อยู่', 'Address'), 'บ้านเลขที่ หมู่ ซอย ถนน', 'w2', 'text', 'street-address', ad0.line) + f('sd', t('แขวง/ตำบล', 'Subdistrict'), '', '', 'text', '', ad0.sub) + f('ds', t('เขต/อำเภอ', 'District'), '', '', 'text', '', ad0.dist) +
+  return '<div class="top"><h1>' + t('ชำระเงิน', 'Checkout') + '</h1><a class="sm" href="#/cart">' + t('กลับไปตะกร้า', 'Back to cart') + '</a></div>' + (SB_USER && ad0.line ? '<p class="sm">' + (fromLast ? t('ดึงที่อยู่จากออเดอร์ล่าสุดให้แล้ว', 'Address filled from your latest order') + ' (' + esc(lastA.no) + ')' : t('ดึงที่อยู่จากบัญชีให้แล้ว', 'Address filled from your account')) + t(' — แก้ได้ตรงนี้', ' — editable here') + '</p>' : '') + '<div class="ck"><div><div class="fm" style="grid-template-columns:1fr 1fr">' + f('em', 'Email', 'name@example.com', 'w2', 'email', 'email', stEm) + f('nm', t('ชื่อ-นามสกุล', 'Full name'), 'ชื่อ-นามสกุล', 'w2', 'text', '', ad0.name) + f('ph', t('โทรศัพท์', 'Phone'), '081 234 5678', 'w2', 'tel', 'tel', ad0.phone) + f('ad', t('ที่อยู่', 'Address'), 'บ้านเลขที่ หมู่ ซอย ถนน', 'w2', 'text', 'street-address', ad0.line) + f('sd', t('แขวง/ตำบล', 'Subdistrict'), '', '', 'text', '', ad0.sub) + f('ds', t('เขต/อำเภอ', 'District'), '', '', 'text', '', ad0.dist) +
     '<label>' + t('จังหวัด', 'Province') + '<input id="pv" list="pvl" placeholder="' + t('เลือกหรือพิมพ์จังหวัด', 'Select province') + '" value="' + esc(ad0.prov) + '"></label><datalist id="pvl">' + PROV.map(function (p) { return '<option value="' + p + '">'; }).join('') + '</datalist>' + f('zp', t('รหัสไปรษณีย์', 'Postcode'), '10110', '', 'text', 'postal-code', ad0.zip) + '</div>' +
-    '<h3 style="font-size:28px;margin:28px 0 12px">' + t('ชำระเงิน', 'Payment') + '</h3><div style="display:grid;gap:10px">' + pays.map(function (a, i) { return '<label class="pay"><input type="radio" name="pay" value="' + a[0] + '"' + (i ? '' : ' checked') + '><span><b>' + a[1] + '</b><br>' + a[2] + '</span></label>'; }).join('') + '</div></div>' +
+    '<h3 style="font-size:28px;margin:28px 0 12px">' + t('ชำระเงิน', 'Payment') + '</h3><div style="display:grid;gap:10px">' + pays.map(function (a, i) { var ck = st.pay ? (st.pay === a[0]) : !i; return '<label class="pay"><input type="radio" name="pay" value="' + a[0] + '"' + (ck ? ' checked' : '') + '><span><b>' + a[1] + '</b><br>' + a[2] + '</span></label>'; }).join('') + '</div></div>' +
     '<div class="fm" style="grid-template-columns:1fr;position:sticky;top:80px"><h3 style="font-size:28px">' + t('สรุปคำสั่งซื้อ', 'Order summary') + '</h3>' + items + sumbox(calc(), 0) + '<button class="btn p" onclick="place()">' + t('สั่งซื้อ', 'Place order') + '</button></div></div>';
 }
 async function place() {
@@ -439,7 +442,7 @@ async function place() {
     try { await sb().from('profiles').update({ full_name: g('nm'), phone: ph, address: { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp } }).eq('id', SB_USER.id); } catch (e) {}
     try { if (SB_PROFILE) { SB_PROFILE.full_name = g('nm'); SB_PROFILE.phone = ph; SB_PROFILE.address = { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp }; } } catch (e) {}
   }
-  CART = []; DC = ''; csave(); location.hash = '#/done/' + o.no;
+  CART = []; DC = ''; csave(); try { sessionStorage.removeItem('jg_checkout'); } catch (e) {} location.hash = '#/done/' + o.no;
 }
 function doneView(no) {
   var o = ORDS[no]; if (!o) return '<div class="top"><h1>' + t('ไม่พบคำสั่งซื้อ', 'Order not found') + '</h1></div>';
@@ -506,11 +509,14 @@ function form() {
     fld('price', 'Price (THB)', 'number') + fld('compare', 'Compare-at', 'number') + fld('cost', 'Cost', 'number') + fld('stock', 'Stock', 'number') + fld('low', 'Low threshold', 'number') +
     fld('colors', 'Colors (comma)', '', 'w2') + fld('sizes', 'Sizes (comma)', '', 'w2') + fld('tags', 'Tags', '', 'w4') + csui() + vsui() + fld('desc', 'Short description', 'ta', 'w4') + fld('spec', 'Specifications', 'ta', 'w2') + fld('material', 'Material', 'ta', 'w2') + fld('dims', 'Dimensions', 'ta', 'w2') + fld('notes', 'Field notes', 'ta', 'w2') + imgui() + '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">' + t('บันทึกสินค้า', 'Save product') + '</button><button class="btn" onclick="E=null;go()">' + t('ยกเลิก', 'Cancel') + '</button></div></div>';
 }
-function edit(i) { E = i < 0 ? mk('new-' + Date.now().toString(36), '', 'Apparel', 'Core', 0, 0, 0, 0, ['Black'], ['One size'], 0, '') : JSON.parse(JSON.stringify(P[i])); E._i = i; EI = (IM[E.id] || []).map(function (u) { return { u: u, c: '' }; }); Object.keys(CIM[E.id] || {}).forEach(function (col) { (CIM[E.id][col] || []).forEach(function (u) { EI.push({ u: u, c: col }); }); }); if (i < 0) { E.status = 'draft'; E.sku = ''; } go(); var f = $('#fm'); f && f.scrollIntoView({ behavior: 'smooth' }); }
+function edit(i) { E = i < 0 ? mk('new-' + Date.now().toString(36), '', 'Apparel', 'Core', 0, 0, 0, 0, ['Black'], ['One size'], 0, '') : JSON.parse(JSON.stringify(P[i])); E._i = i; E._id = i < 0 ? E.id : P[i].id; EI = (IM[E.id] || []).map(function (u) { return { u: u, c: '' }; }); Object.keys(CIM[E.id] || {}).forEach(function (col) { (CIM[E.id][col] || []).forEach(function (u) { EI.push({ u: u, c: col }); }); }); if (i < 0) { E.status = 'draft'; E.sku = ''; } go(); var f = $('#fm'); f && f.scrollIntoView({ behavior: 'smooth' }); }
 async function commit() {
   if (!isStaff()) { T('ต้อง login เป็น staff'); return; }
   if (!isOwner() && myRole() === 'shop_admin' && arguments.length === 0) { /* stock-only enforced below */ }
   var o = JSON.parse(JSON.stringify(E)), i = o._i; delete o._i;
+  var eid = o._id; delete o._id;
+  if (eid && i >= 0) { var ri = P.findIndex(function (x) { return x.id === eid; }); if (ri > -1) i = ri; }
+  if (i >= 0 && (!P[i] || P[i].id !== eid)) i = -1; // สินค้าถูกลบระหว่างดราฟ -> บันทึกเป็นตัวใหม่
   document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k, v = e.value; if (['price', 'compare', 'cost', 'stock', 'low'].indexOf(k) > -1) v = Math.max(0, parseInt(v, 10) || 0); else if (k == 'colors' || k == 'sizes') v = v.split(',').map(function (x) { return x.trim(); }).filter(Boolean); else if (k == 'featured') v = v == '1' ? 1 : 0; o[k] = v; });
   var csm = {}; document.querySelectorAll('#fm [data-cs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) csm[e.dataset.cs] = v; });
   o.cstock = csm;
@@ -1010,7 +1016,26 @@ function go() {
   if (isH) { heroInit(); dropInit(); }
   applyLogo();
 }
-window.addEventListener('hashchange', function () { Q = 1; SEL = {}; E = null; HS = null; PGS = null; hc(); go(); scrollTo(0, 0); });
+/* จำดราฟที่กรอกค้างไว้ก่อนสลับหน้า (ไม่กดเซฟก็ไม่หาย) */
+function preserveDrafts() {
+  try {
+    if (document.getElementById('fm')) {
+      sync();
+      var csm = {}; document.querySelectorAll('#fm [data-cs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) csm[e.dataset.cs] = v; });
+      var vsm = {}; document.querySelectorAll('#fm [data-vs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) vsm[e.getAttribute('data-vs')] = v; });
+      if (E) { E.cstock = csm; E.vstock = vsm; }
+    }
+    var co = {};
+    ['em', 'nm', 'ph', 'ad', 'sd', 'ds', 'pv', 'zp'].forEach(function (id) { var el = document.getElementById(id); if (el) co[id] = el.value; });
+    if (co.em != null || co.nm != null) {
+      var pay = document.querySelector('input[name=pay]:checked');
+      if (pay) co.pay = pay.value;
+      try { sessionStorage.setItem('jg_checkout', JSON.stringify(co)); } catch (e) {}
+    }
+  } catch (e) {}
+}
+function checkoutStash() { try { return JSON.parse(sessionStorage.getItem('jg_checkout') || 'null'); } catch (e) { return null; } }
+window.addEventListener('hashchange', function () { preserveDrafts(); Q = 1; SEL = {}; hc(); go(); scrollTo(0, 0); });
 
 /* ---------- boot ---------- */
 loadLocal(); handleAuthRedirect(); hc(); go();
