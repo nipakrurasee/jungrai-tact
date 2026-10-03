@@ -118,15 +118,21 @@ function art(p, c) {
   return '<svg viewBox="0 0 400 480" aria-hidden="true" fill="' + h + '" stroke="#0a0a09" stroke-width="2">' + s + '</svg>';
 }
 function pic(p, i, c) {
-  var m = IM[p.id], u = m && m[i];
+  var m = allImgs(p.id), u = m && m[i];
   if (u && (/^(https?:|data:image|\.\/|img\/|\/)/.test(u) || /\.(jpg|jpeg|png|webp|svg|gif)(\?.*)?$/i.test(u))) return '<img src="' + u + '" alt="' + esc(p.name) + '" loading="lazy">';
   return art(p, c);
 }
-/* รูปของสีที่เลือกก่อน ถ้าไม่มีใช้รูปกลาง */
+/* รูปของสีที่เลือกก่อน ถ้าไม่มีใช้รูปกลาง ถ้าไม่มีเลยใช้รูปแรกที่มี */
+function allImgs(pid) {
+  var out = (IM[pid] || []).slice();
+  Object.keys(CIM[pid] || {}).forEach(function (k) { (CIM[pid][k] || []).forEach(function (u) { if (out.indexOf(u) < 0) out.push(u); }); });
+  return out;
+}
 function galImgs(p) {
   var m = CIM[p.id] || {}, l = m[SEL.c];
   if (l && l.length) return l;
-  return IM[p.id] || [];
+  if (IM[p.id] && IM[p.id].length) return IM[p.id];
+  return allImgs(p.id);
 }
 function gal(p) {
   var imgs = galImgs(p); GIMGS = imgs.slice(); var n = imgs.length;
