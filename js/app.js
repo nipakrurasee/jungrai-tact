@@ -527,21 +527,22 @@ function admin() {
 }
 function form() {
   var ro = myRole() === 'shop_admin' ? '<div class="note w4">Shop admin: แก้ได้เฉพาะ Stock / Low threshold / Status — ช่องอื่นจะถูกคงค่าเดิมตอนบันทึก</div>' : '';
-  var sec = function (n, t) { return '<h3 class="w4 row" style="font-size:24px;margin-top:8px;justify-content:flex-start"><span class="bd">' + n + '</span><span style="flex:1">' + t + '</span><button class="btn s p" onclick="commit()">' + t('บันทึก', 'Save') + '</button></h3>'; };
+  var sec = function (n, t) { return '<h3 class="w4" style="font-size:24px;margin-top:8px"><span class="bd">' + n + '</span> ' + t + '</h3>'; };
+  var sv = function () { return '<div class="w4"><button class="btn s p" onclick="commit()">' + t('บันทึก', 'Save') + '</button></div>'; };
   return '<div class="fm" id="fm">' + ro +
     sec('1', t('ข้อมูลหลัก', 'Basic info')) +
     fld('name', t('ชื่อสินค้า *', 'Product name *'), '', 'w2') + fld('sku', 'SKU') + fld('barcode', 'Barcode') +
     '<label>' + t('หมวด', 'Category') + '<select data-k="cat">' + CAT.map(function (c) { return '<option' + (E.cat == c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label>' + fld('coll', t('คอลเลกชัน', 'Collection')) +
     '<label>' + t('สถานะขาย', 'Status') + '<select data-k="status">' + [['active', t('ขาย', 'Active')], ['draft', t('ฉบับร่าง', 'Draft')], ['archived', t('เก็บ', 'Archived')]].map(function (c) { return '<option value="' + c[0] + '"' + (E.status == c[0] ? ' selected' : '') + '>' + c[1] + '</option>'; }).join('') + '</select></label>' +
-    '<label>' + t('แนะนำหน้าแรก', 'Featured') + '<select data-k="featured"><option value="0">' + t('ไม่', 'No') + '</option><option value="1"' + (E.featured ? ' selected' : '') + '>' + t('ใช่', 'Yes') + '</option></select></label>' +
+    '<label>' + t('แนะนำหน้าแรก', 'Featured') + '<select data-k="featured"><option value="0">' + t('ไม่', 'No') + '</option><option value="1"' + (E.featured ? ' selected' : '') + '>' + t('ใช่', 'Yes') + '</option></select></label>' + sv() +
     sec('2', t('ราคา', 'Pricing')) +
-    fld('price', t('ราคาขาย (฿) *', 'Price (THB) *'), 'number') + fld('compare', t('ราคาขีดฆ่า', 'Compare-at'), 'number') + fld('cost', t('ต้นทุน', 'Cost'), 'number') + '<div class="w4 sm" style="align-self:end">' + t('กำไร/ชิ้น = ราคาขาย − ต้นทุน', 'Margin = price − cost') + '</div>' +
+    fld('price', t('ราคาขาย (฿) *', 'Price (THB) *'), 'number') + fld('compare', t('ราคาขีดฆ่า', 'Compare-at'), 'number') + fld('cost', t('ต้นทุน', 'Cost'), 'number') + '<div class="w4 sm" style="align-self:end">' + t('กำไร/ชิ้น = ราคาขาย − ต้นทุน', 'Margin = price − cost') + '</div>' + sv() +
     sec('3', t('ตัวเลือก + สต็อก', 'Options + stock')) +
     optChips() +
     fld('stock', t('สต็อกรวม', 'Total stock'), 'number') + fld('low', t('เตือนเมื่อเหลือ', 'Low threshold'), 'number') +
-    '<div class="w4 sm">' + t('กรอกสต็อกแยกชุดด้านล่าง ยอดรวมคำนวณเอง (เว้นว่าง = ข้าม)', 'Fill per-variant stock below, total auto-calculated (blank = skip)') + '</div>' + vsui() + fld('tags', 'Tags', '', 'w4') +
+    '<div class="w4 sm">' + t('กรอกสต็อกแยกชุดด้านล่าง ยอดรวมคำนวณเอง (เว้นว่าง = ข้าม)', 'Fill per-variant stock below, total auto-calculated (blank = skip)') + '</div>' + vsui() + fld('tags', 'Tags', '', 'w4') + sv() +
     sec('4', t('รายละเอียด', 'Details')) +
-    fld('desc', t('คำโปรยสั้น', 'Short description'), 'ta', 'w4') + fld('spec', t('สเปก', 'Specifications'), 'ta', 'w2') + fld('material', t('วัสดุ', 'Material'), 'ta', 'w2') + fld('dims', t('ขนาด', 'Dimensions'), 'ta', 'w2') + fld('notes', t('โน้ตภาคสนาม', 'Field notes'), 'ta', 'w2') +
+    fld('desc', t('คำโปรยสั้น', 'Short description'), 'ta', 'w4') + fld('spec', t('สเปก', 'Specifications'), 'ta', 'w2') + fld('material', t('วัสดุ', 'Material'), 'ta', 'w2') + fld('dims', t('ขนาด', 'Dimensions'), 'ta', 'w2') + fld('notes', t('โน้ตภาคสนาม', 'Field notes'), 'ta', 'w2') + sv() +
     sec('5', t('รูปภาพ (สูงสุด 4)', 'Images (max 4)')) + imgui() +
     '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">' + t('บันทึกสินค้า', 'Save product') + '</button><button class="btn" onclick="cancelEdit()">' + t('ยกเลิก', 'Cancel') + '</button></div></div>';
 }
