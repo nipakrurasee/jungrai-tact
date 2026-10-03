@@ -553,7 +553,7 @@ function form() {
     sec('3', t('ตัวเลือก + สต็อก', 'Options + stock')) +
     optChips() +
     fld('stock', t('สต็อกรวม', 'Total stock'), 'number') + fld('low', t('เตือนเมื่อเหลือ', 'Low threshold'), 'number') +
-    '<div class="w4 sm">' + t('ถ้ากรอกสต็อกแยกสี/ไซส์ด้านล่าง ยอดรวมจะคำนวณเอง', 'Fill per-color/size below and total is auto-calculated') + '</div>' + csui() + vsui() + fld('tags', 'Tags', '', 'w4') +
+    '<div class="w4 sm">' + t('กรอกสต็อกแยกชุดด้านล่าง ยอดรวมคำนวณเอง (เว้นว่าง = ข้าม)', 'Fill per-variant stock below, total auto-calculated (blank = skip)') + '</div>' + vsui() + fld('tags', 'Tags', '', 'w4') +
     sec('4', t('รายละเอียด', 'Details')) +
     fld('desc', t('คำโปรยสั้น', 'Short description'), 'ta', 'w4') + fld('spec', t('สเปก', 'Specifications'), 'ta', 'w2') + fld('material', t('วัสดุ', 'Material'), 'ta', 'w2') + fld('dims', t('ขนาด', 'Dimensions'), 'ta', 'w2') + fld('notes', t('โน้ตภาคสนาม', 'Field notes'), 'ta', 'w2') +
     sec('5', t('รูปภาพ (สูงสุด 4)', 'Images (max 4)')) + imgui() +
@@ -569,18 +569,17 @@ async function commit() {
   if (i >= 0 && (!P[i] || P[i].id !== eid)) i = -1; // สินค้าถูกลบระหว่างดราฟ -> บันทึกเป็นตัวใหม่
   document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k, v = e.value; if (k == 'colors' || k == 'sizes') return; if (['price', 'compare', 'cost', 'stock', 'low'].indexOf(k) > -1) v = Math.max(0, parseInt(v, 10) || 0); else if (k == 'featured') v = v == '1' ? 1 : 0; o[k] = v; });
   if (!Array.isArray(o.colors)) o.colors = []; if (!Array.isArray(o.sizes)) o.sizes = [];
-  var csm = {}; document.querySelectorAll('#fm [data-cs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) csm[e.dataset.cs] = v; });
-  o.cstock = csm;
-  var vsm = {}; document.querySelectorAll('#fm [data-vs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) vsm[e.getAttribute('data-vs')] = v; });
+  var vsInputs = document.querySelectorAll('#fm [data-vs]');
+  var vsm = {}; vsInputs.forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) vsm[e.getAttribute('data-vs')] = v; });
   o.vstock = vsm;
   // ตัดคีย์เก่าที่สี/ไซส์ไม่อยู่ในรายการแล้ว (กันคีย์ค้างทำให้ซื้อไม่ได้)
   var okCols = {}, okVs = {};
   (o.colors || []).forEach(function (c) { okCols[c] = 1; });
-  Object.keys(o.cstock || {}).forEach(function (k) { if (!okCols[k]) delete o.cstock[k]; });
   (o.sizes || []).forEach(function (s) { okVs[s] = 1; });
   Object.keys(o.vstock || {}).forEach(function (k) { var a = k.split('__'); if (!okCols[a[0]] || !okVs[a[1]]) delete o.vstock[k]; });
-  if (Object.keys(vsm).length) { vsSync(o); } // variant -> รายสี + ยอดรวม
-  else if (Object.keys(csm).length) o.stock = cstockSum(csm); // ยอดรวม = ผลรวมรายสี
+  if (Object.keys(o.vstock).length) { vsSync(o); } // variant -> รายสี + ยอดรวม
+  else if (vsInputs.length) { o.vstock = {}; o.cstock = {}; } // ล้าง matrix หมด = กลับใช้ยอดรวม
+  else { o.cstock = (E.cstock && Object.keys(E.cstock).length) ? E.cstock : {}; } // ไม่มี matrix: คงรายสีเดิมไว้
   if (!o.name.trim()) { T(t('กรอกชื่อสินค้า', 'Enter a product name')); return; }
   if (!o.colors.length) o.colors = ['Black']; if (!o.sizes.length) o.sizes = ['One size'];
   if (o._new !== false && i < 0) o.id = 'p-' + Date.now().toString(36);
@@ -645,10 +644,6 @@ function vsui() {
   return '<div class="w4"><span>' + t('สต็อกแยกสี×ไซส์ (เว้นว่าง = ข้าม)', 'Stock per color×size (blank = skip)') + '</span><div class="sc" style="margin-top:6px"><table class="tb"><tr><th></th>' + szs.map(function (s) { return '<th>' + esc(s) + '</th>'; }).join('') + '</tr>' + cols.map(function (c) { return '<tr><td><b>' + esc(c) + '</b></td>' + szs.map(function (s) { return '<td><input data-vs="' + esc(c) + '__' + esc(s) + '" type="number" min="0" style="width:80px" value="' + (cur[vsKey(c, s)] != null ? cur[vsKey(c, s)] : '') + '"></td>'; }).join('') + '</tr>'; }).join('') + '</table></div></div>';
 }
 function eiset(i, v) { sync(); EI[i].c = v; redraw(); }
-function csui() {
-  var cols = ecols(); if (!cols.length) return '';
-  return '<div class="w4"><span>' + t('สต็อกแยกสี (เว้นว่าง = ใช้สต็อกรวม)', 'Stock per color (blank = use total)') + '</span><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">' + cols.map(function (c) { return '<label style="min-width:110px">' + esc(c) + '<input data-cs="' + esc(c) + '" type="number" min="0" value="' + ((E.cstock && E.cstock[c] != null) ? E.cstock[c] : '') + '" placeholder="' + t('รวม', 'total') + '"></label>'; }).join('') + '</div></div>';
-}
 function imgui() {
   var cols = ecols();
   function cosel(s, i) { return '<select onchange="eiset(' + i + ',this.value)" style="margin-top:6px;width:100%"><option value="">' + t('ทุกสี', 'All colors') + '</option>' + cols.map(function (c) { return '<option value="' + esc(c) + '"' + (s.c === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>'; }
@@ -1162,9 +1157,8 @@ function preserveDrafts() {
   try {
     if (document.getElementById('fm')) {
       sync();
-      var csm = {}; document.querySelectorAll('#fm [data-cs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) csm[e.dataset.cs] = v; });
       var vsm = {}; document.querySelectorAll('#fm [data-vs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) vsm[e.getAttribute('data-vs')] = v; });
-      if (E) { E.cstock = csm; E.vstock = vsm; }
+      if (E) { E.vstock = vsm; }
     }
     var co = {};
     ['em', 'nm', 'ph', 'ad', 'sd', 'ds', 'pv', 'zp'].forEach(function (id) { var el = document.getElementById(id); if (el) co[id] = el.value; });
