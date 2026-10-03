@@ -36,6 +36,7 @@ var CART = [], DC = '', ORDS = {}, CUR = 'THB', OO = '';
 var WL = [], RV = {}, MD = []; // wishlist ids, reviews by product, media rows
 var CIM = {}; // product id -> {color: [urls]} รูปแยกตามสี
 var CUSTS = []; // customers table (staff only)
+var RPC_OK = true; // false = ยังไม่รัน migration_stock_rpc.sql
 var LANG = 'TH'; // TH | EN
 try { LANG = localStorage.getItem('jt_lang') || 'TH'; } catch (e) {}
 function t(th, en) { return LANG === 'TH' ? th : en; }
@@ -205,6 +206,8 @@ async function loadSupabase() {
     if (cf.data) cf.data.forEach(function (r) { if (r.key == 'home') { H.secs = r.value.secs || 7; H.logo = r.value.logo == 0 ? 0 : 1; H.wm = r.value.wm == 0 ? 0 : 1; } if (r.key == 'page') { PG = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PAGE)), r.value); } });
     var se = await c.auth.getSession(); SB_USER = se.data.session ? se.data.session.user : null;
     await loadRole();
+    try { var ping = await c.rpc('deduct_for_order', { p_no: '___ping___' }); RPC_OK = !ping.error; }
+    catch (e) { RPC_OK = false; }
     // กันเห็นออเดอร์ข้าม user: login แล้วใช้ข้อมูล server ของตัวเองเท่านั้น
     if (SB_USER) { ORDS = {}; CUSTS = []; await claimGuestOrders(); await applyPendingProfile(); }
     var od;
@@ -445,11 +448,17 @@ async function place() {
     var ins = await c.from('orders').insert({ order_no: o.no, customer: o.cust, address: o.addr, items: o.items, subtotal: o.sub, discount: o.d, shipping: o.ship, total: o.total, discount_code: o.code, payment_method: o.pay, status: o.status, tracking: o.track, note: o.note, stock_deducted: 0, log: o.log, user_id: (SB_USER && SB_USER.id) || null, customer_email: em.toLowerCase() });
     if (ins.error) { delete ORDS[o.no]; T(t('สั่งไม่สำเร็จ: ', 'Order failed: ') + ins.error.message); done(); return; }
     var dd = await c.rpc('deduct_for_order', { p_no: o.no });
-    if (dd.error || !dd.data || !dd.data.ok) {
+    if (dd.error) {
+      // ระบบตัดสต็อกล้มเหลว (เช่น ยังไม่รัน migration) — เก็บออเดอร์ไว้ให้ staff จัดการ ไม่ล้างตะกร้า
+      T(t('ระบบตัดสต็อกล้มเหลว ออเดอร์ถูกบันทึกแล้ว ร้านจะติดต่อกลับ (', 'Stock system error — order saved, shop will contact you (') + String((dd.error && dd.error.message) || dd.error).slice(0, 80) + ')');
+      done(); location.hash = '#/done/' + o.no; return;
+    }
+    if (!dd.data || !dd.data.ok) {
+      var hv = (dd.data && dd.data.have) != null ? dd.data.have : 0;
       o.status = 'cancelled'; o.log.push({ t: new Date().toISOString(), s: 'Auto-cancelled: insufficient stock' });
       try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
       await loadSupabase();
-      T(t('ของไม่พอแล้ว ออเดอร์ถูกยกเลิก ปรับตะกร้าใหม่', 'Insufficient stock — order cancelled'));
+      T(t('ของไม่พอ (เหลือ ', 'Insufficient (only ') + hv + t(' ชิ้น) ออเดอร์ถูกยกเลิก ปรับตะกร้าใหม่', ' left) — order cancelled'));
       done(); location.hash = '#/cart'; go(); return;
     }
     o.stockDone = 1;
@@ -552,6 +561,12 @@ async function commit() {
   o.cstock = csm;
   var vsm = {}; document.querySelectorAll('#fm [data-vs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) vsm[e.getAttribute('data-vs')] = v; });
   o.vstock = vsm;
+  // ตัดคีย์เก่าที่สี/ไซส์ไม่อยู่ในรายการแล้ว (กันคีย์ค้างทำให้ซื้อไม่ได้)
+  var okCols = {}, okVs = {};
+  (o.colors || []).forEach(function (c) { okCols[c] = 1; });
+  Object.keys(o.cstock || {}).forEach(function (k) { if (!okCols[k]) delete o.cstock[k]; });
+  (o.sizes || []).forEach(function (s) { okVs[s] = 1; });
+  Object.keys(o.vstock || {}).forEach(function (k) { var a = k.split('__'); if (!okCols[a[0]] || !okVs[a[1]]) delete o.vstock[k]; });
   if (Object.keys(vsm).length) { vsSync(o); } // variant -> รายสี + ยอดรวม
   else if (Object.keys(csm).length) o.stock = cstockSum(csm); // ยอดรวม = ผลรวมรายสี
   if (!o.name.trim()) { T(t('กรอกชื่อสินค้า', 'Enter a product name')); return; }
@@ -829,7 +844,7 @@ window.jtSaveSettings = function (section) {
 };
 function jtDashboard() {
   var os = Object.keys(ORDS).map(function (k) { return ORDS[k]; }), sales = os.filter(function (o) { return !['cancelled', 'refunded'].includes(o.status); }).reduce(function (a, o) { return a + Number(o.total || 0); }, 0), pending = os.filter(function (o) { return ['new'].includes(o.status); }).length;
-  return jtShell(t('แดชบอร์ด', 'Dashboard'), '#/admin/dashboard', '<div class="jt-grid"><div class="jt-kpi"><span>' + t('สินค้า', 'Products') + '</span><b>' + P.length + '</b></div><div class="jt-kpi"><span>' + t('ออเดอร์', 'Orders') + '</span><b>' + os.length + '</b></div><div class="jt-kpi"><span>' + t('ยอดขาย', 'Sales') + '</span><b>' + bt(sales) + '</b></div><div class="jt-kpi"><span>' + t('บทบาท', 'Role') + '</span><b style="font-size:20px">' + esc(roleLabel()) + '</b></div></div><div class="jt-panel"><span class="jgt-kpi">Mode</span><p>' + (sb() ? 'Supabase live: ' + esc(SB.url) + ' · ' + esc(SB_USER ? SB_USER.email : 'guest') : t('Local mode — ตั้งค่า Supabase ที่ SYSTEM › Supabase', 'Local mode — connect Supabase under SYSTEM › Supabase')) + '</p></div>');
+  return jtShell(t('แดชบอร์ด', 'Dashboard'), '#/admin/dashboard', '<div class="jt-grid"><div class="jt-kpi"><span>' + t('สินค้า', 'Products') + '</span><b>' + P.length + '</b></div><div class="jt-kpi"><span>' + t('ออเดอร์', 'Orders') + '</span><b>' + os.length + '</b></div><div class="jt-kpi"><span>' + t('ยอดขาย', 'Sales') + '</span><b>' + bt(sales) + '</b></div><div class="jt-kpi"><span>' + t('บทบาท', 'Role') + '</span><b style="font-size:20px">' + esc(roleLabel()) + '</b></div></div>' + (RPC_OK ? '' : '<div class="note" style="border-color:var(--rd);color:var(--rd)">' + t('ระบบตัดสต็อกยังไม่พร้อม — รัน supabase/migration_stock_rpc.sql ใน SQL Editor', 'Stock RPC missing — run supabase/migration_stock_rpc.sql') + '</div>') + '<div class="jt-panel"><span class="jgt-kpi">Mode</span><p>' + (sb() ? 'Supabase live: ' + esc(SB.url) + ' · ' + esc(SB_USER ? SB_USER.email : 'guest') : t('Local mode — ตั้งค่า Supabase ที่ SYSTEM › Supabase', 'Local mode — connect Supabase under SYSTEM › Supabase')) + '</p></div>');
 }
 function jtInventory() { return jtShell(t('สต็อก', 'Inventory'), '#/admin/inventory', '<div class="jt-panel"><div style="margin-bottom:12px"><button class="btn s" onclick="stockRefresh(true)">' + t('รีเฟรชยอดล่าสุด', 'Refresh') + '</button></div><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>SKU</th><th>' + t('คงเหลือ', 'Remaining') + '</th><th>' + t('แยกสี', 'By color') + '</th><th>' + t('สถานะ', 'Status') + '</th></tr>' + P.map(function (p) { var n2 = Number(p.stock || 0); return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.sku) + '</td><td><b>' + n2 + '</b></td><td>' + esc(csText(p) || '-') + (vsText(p) ? '<br><span class="sm">' + esc(vsText(p)) + '</span>' : '') + '</td><td>' + (n2 <= 0 ? t('หมด', 'OUT') : n2 <= Number(p.low || 5) ? t('น้อย', 'LOW') + ' (' + t('เตือนที่ ', 'low at ') + p.low + ')' : t('ปกติ', 'IN')) + '</td></tr>'; }).join('') + '</table></div>'); }
 function jtCustomers() {
