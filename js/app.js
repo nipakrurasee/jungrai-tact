@@ -490,7 +490,7 @@ async function place() {
     try { await sb().from('profiles').update({ full_name: g('nm'), phone: ph, address: { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp } }).eq('id', SB_USER.id); } catch (e) {}
     try { if (SB_PROFILE) { SB_PROFILE.full_name = g('nm'); SB_PROFILE.phone = ph; SB_PROFILE.address = { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp }; } } catch (e) {}
   }
-  CART = []; DC = ''; csave(); try { sessionStorage.removeItem('jg_checkout'); } catch (e) {} done(); location.hash = '#/done/' + o.no;
+  CART = []; DC = ''; csave(); try { localStorage.removeItem('jg_checkout'); } catch (e) {} done(); location.hash = '#/done/' + o.no;
 }
 function doneView(no) {
   var o = ORDS[no]; if (!o) return '<div class="top"><h1>' + t('ไม่พบคำสั่งซื้อ', 'Order not found') + '</h1></div>';
@@ -618,12 +618,12 @@ function sync() {
   f.querySelectorAll('[data-k]').forEach(function (e) { var k = e.dataset.k; if (k == 'colors' || k == 'sizes') return; E[k] = k == 'featured' ? (e.value == '1' ? 1 : 0) : e.value; });
   var vsInputs = f.querySelectorAll('[data-vs]');
   if (vsInputs.length) { var vsm = {}; vsInputs.forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) vsm[e.getAttribute('data-vs')] = v; }); E.vstock = vsm; }
-  try { sessionStorage.setItem('jg_draft', JSON.stringify({ E: E, EI: EI })); } catch (e) {}
+  try { localStorage.setItem('jg_draft', JSON.stringify({ E: E, EI: EI })); } catch (e) {}
 }
-function clearDraft() { try { sessionStorage.removeItem('jg_draft'); } catch (e) {} }
+function clearDraft() { try { localStorage.removeItem('jg_draft'); } catch (e) {} }
 function loadDraft() {
   try {
-    var d = JSON.parse(sessionStorage.getItem('jg_draft') || 'null');
+    var d = JSON.parse(localStorage.getItem('jg_draft') || 'null');
     if (d && d.E && (d.E._id || d.E._i != null)) { E = d.E; EI = d.EI || []; return true; }
   } catch (e) {}
   return false;
@@ -1183,27 +1183,27 @@ function preserveDrafts() {
   try {
     if (document.getElementById('fm')) sync();
     try {
-      if (HS) sessionStorage.setItem('jg_draft_home', JSON.stringify(HS));
-      if (PGS) sessionStorage.setItem('jg_draft_page', JSON.stringify(PGS));
+      if (HS) localStorage.setItem('jg_draft_home', JSON.stringify(HS));
+      if (PGS) localStorage.setItem('jg_draft_page', JSON.stringify(PGS));
     } catch (e) {}
     var co = {};
     ['em', 'nm', 'ph', 'ad', 'sd', 'ds', 'pv', 'zp'].forEach(function (id) { var el = document.getElementById(id); if (el) co[id] = el.value; });
     if (co.em != null || co.nm != null) {
       var pay = document.querySelector('input[name=pay]:checked');
       if (pay) co.pay = pay.value;
-      try { sessionStorage.setItem('jg_checkout', JSON.stringify(co)); } catch (e) {}
+      try { localStorage.setItem('jg_checkout', JSON.stringify(co)); } catch (e) {}
     }
   } catch (e) {}
 }
-function checkoutStash() { try { return JSON.parse(sessionStorage.getItem('jg_checkout') || 'null'); } catch (e) { return null; } }
+function checkoutStash() { try { return JSON.parse(localStorage.getItem('jg_checkout') || 'null'); } catch (e) { return null; } }
 window.addEventListener('hashchange', function () { preserveDrafts(); Q = 1; SEL = {}; hc(); go(); scrollTo(0, 0); });
 
 /* ---------- boot ---------- */
 loadLocal(); handleAuthRedirect(); hc();
 if (!E && loadDraft()) { /* มีดราฟค้าง: เปิดฟอร์มต่อ */ }
 try {
-  if (!HS) HS = JSON.parse(sessionStorage.getItem('jg_draft_home') || 'null');
-  if (!PGS) PGS = JSON.parse(sessionStorage.getItem('jg_draft_page') || 'null');
+  if (!HS) HS = JSON.parse(localStorage.getItem('jg_draft_home') || 'null');
+  if (!PGS) PGS = JSON.parse(localStorage.getItem('jg_draft_page') || 'null');
 } catch (e) {}
 go();
 (async function () {
