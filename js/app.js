@@ -30,7 +30,8 @@ var DEFAULT_PAGE = {
 
 var P = JSON.parse(JSON.stringify(SEED_PRODUCTS));
 var IM = {}; // id -> [imageUrl,...] (http หรือ dataURL)
-var H = { slides: JSON.parse(JSON.stringify(SEED_SLIDES)), secs: 7, logo: 1, wm: 1 };
+var DEFAULT_LOGO = 'https://bsvckqhrdoxuacofpozr.supabase.co/storage/v1/object/public/media/lib/mus44b1r-0.jpg';
+var H = { slides: JSON.parse(JSON.stringify(SEED_SLIDES)), secs: 7, logo: 1, wm: 1, logoUrl: DEFAULT_LOGO, wmUrl: DEFAULT_LOGO };
 var PG = JSON.parse(JSON.stringify(DEFAULT_PAGE));
 var CART = [], DC = '', ORDS = {}, CUR = 'THB', OO = '';
 var WL = [], RV = {}, MD = []; // wishlist ids, reviews by product, media rows
@@ -175,6 +176,7 @@ function loadLocal() {
   try { ORDS = JSON.parse(localStorage.getItem('jg_orders')) || {}; } catch (e) { ORDS = {}; }
   try { CUR = localStorage.getItem('jg_cur') || 'THB'; } catch (e) {}
   if (H.logo == null) H.logo = 1; if (H.wm == null) H.wm = 1;
+  if (!H.logoUrl) H.logoUrl = DEFAULT_LOGO; if (!H.wmUrl) H.wmUrl = DEFAULT_LOGO;
   fixPG(); imgFallback();
 }
 function fixPG() {
@@ -212,7 +214,7 @@ async function loadSupabase() {
       H.slides = sl.data.map(function (r) { return { id: r.id, h: r.headline, sub: r.subheadline, b1: r.btn1_text, l1: r.btn1_link, b2: r.btn2_text, l2: r.btn2_link, img: r.image_url || '' }; });
     }
     var cf = await c.from('site_configs').select('*');
-    if (cf.data) cf.data.forEach(function (r) { if (r.key == 'home') { H.secs = r.value.secs || 7; H.logo = r.value.logo == 0 ? 0 : 1; H.wm = r.value.wm == 0 ? 0 : 1; } if (r.key == 'page') { PG = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PAGE)), r.value); } });
+    if (cf.data) cf.data.forEach(function (r) { if (r.key == 'home') { H.secs = r.value.secs || 7; H.logo = r.value.logo == 0 ? 0 : 1; H.wm = r.value.wm == 0 ? 0 : 1; H.logoUrl = r.value.logoUrl || DEFAULT_LOGO; H.wmUrl = r.value.wmUrl || DEFAULT_LOGO; } if (r.key == 'page') { PG = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PAGE)), r.value); } });
     var se = await c.auth.getSession(); SB_USER = se.data.session ? se.data.session.user : null;
     await loadRole();
     try { var ping = await c.rpc('deduct_for_order', { p_no: '___ping___' }); RPC_OK = !ping.error; }
@@ -286,7 +288,7 @@ async function claimGuestOrders() {
 async function dbSavePage() {
   var c = sb(); if (!c) return;
   await c.from('site_configs').upsert({ key: 'page', value: PG }, { onConflict: 'key' });
-  await c.from('site_configs').upsert({ key: 'home', value: { secs: H.secs, logo: H.logo, wm: H.wm } }, { onConflict: 'key' });
+  await c.from('site_configs').upsert({ key: 'home', value: { secs: H.secs, logo: H.logo, wm: H.wm, logoUrl: H.logoUrl || '', wmUrl: H.wmUrl || '' } }, { onConflict: 'key' });
   for (var i = 0; i < H.slides.length; i++) { var s = H.slides[i]; await c.from('slides').upsert({ id: s.id, headline: s.h, subheadline: s.sub, btn1_text: s.b1, btn1_link: s.l1, btn2_text: s.b2, btn2_link: s.l2, image_url: s.img || '', position: i }, { onConflict: 'id' }); }
 }
 
@@ -480,7 +482,7 @@ function simg(u) { return /^(https?:|data:image|\.\/|img\/|\/)/.test(u || '') ||
 function card(p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p.id) + '" class="pn">' + pic(p, 0) + '</a><div class="in"><h3>' + esc(p.name) + '</h3><div class="row"><span>' + thb(p.price) + '</span><span class="av ' + a[0] + '"><b></b>' + a[1] + '</span></div></div></div>'; }
 function homeView() {
   var sl = H.slides, sh = PG.show, CC = ['#2f3123', '#3a352a', '#2a2b2a', '#4a4d33'], SC = ['#2d2f22', '#232420', '#2d2a21', '#1b1c19', '#35382a'];
-  var h = '<div class="hero">' + sl.map(function (s, i) { var u = simg(s.img); return '<div class="sl' + (i ? '' : ' on') + '">' + (u ? '<img src="' + u + '" alt="">' : '') + '<div class="tx"><h1>' + esc(s.h) + '</h1>' + (s.sub ? '<p>' + esc(s.sub) + '</p>' : '') + (s.b1 ? '<a class="btn p" href="' + esc(safe(s.l1)) + '">' + esc(s.b1) + '</a>' : '') + (s.b2 ? '<a class="btn" href="' + esc(safe(s.l2)) + '">' + esc(s.b2) + '</a>' : '') + '</div></div>'; }).join('') + (sl.length > 1 ? '<div class="hd">' + sl.map(function (s, i) { return '<button aria-label="Slide ' + (i + 1) + '" class="' + (i ? '' : 'on') + '" onclick="hshow(' + i + ',1)"></button>'; }).join('') + '</div>' : '') + '</div>';
+  var h = '<div class="hero">' + sl.map(function (s, i) { var u = simg(s.img); return '<div class="sl' + (i ? '' : ' on') + '">' + (u ? '<img src="' + u + '" alt="">' : '') + '<div class="tx"><h1>' + esc(s.h) + '</h1>' + (s.sub ? '<p>' + esc(s.sub) + '</p>' : '') + (s.b1 ? '<a class="btn p" href="' + esc(safe(s.l1)) + '">' + esc(s.b1) + '</a>' : '') + (s.b2 ? '<a class="btn" href="' + esc(safe(s.l2)) + '">' + esc(s.b2) + '</a>' : '') + '</div></div>'; }).join('') + (H.wm && H.wmUrl ? '<img class="wm" src="' + H.wmUrl + '" alt="">' : '') + (sl.length > 1 ? '<div class="hd">' + sl.map(function (s, i) { return '<button aria-label="Slide ' + (i + 1) + '" class="' + (i ? '' : 'on') + '" onclick="hshow(' + i + ',1)"></button>'; }).join('') + '</div>' : '') + '</div>';
   if (sh.cats) h += '<section class="sec"><div class="w"><div class="top"><h2 style="font-size:clamp(40px,6vw,88px)">' + t('คอลเลกชัน', 'Collection') + '</h2><a class="sm" href="#/shop">' + t('ดูทั้งหมด', 'View all') + '</a></div><div class="cats">' + PG.cats.map(function (c, i) { return '<a class="cat pn" href="' + esc(safe(c.l)) + '" style="background:linear-gradient(160deg,' + CC[i % 4] + ',#12130f)"><h3>' + esc(c.t) + '</h3></a>'; }).join('') + '</div></div></section>';
   if (sh.brand) h += '<section class="sec st"><div class="w"><h2>' + esc(PG.brand.h) + '</h2><p>' + esc(PG.brand.p) + '</p></div></section>';
   var fp = list().filter(function (p) { return p.featured; })[0];
@@ -728,6 +730,8 @@ function closeMediaPicker() { mediaCb = null; var ov = document.getElementById('
 function pickMedia(i) { var m = MD[i]; if (m && mediaCb) { var cb = mediaCb; closeMediaPicker(); cb(m.url); } }
 function pickProductImg() { sync(); if (EI.length >= 4) { T(t('ได้สูงสุด 4 รูป', 'Max 4 images')); return; } openMediaPicker(function (url) { EI.push({u:url,c:''}); redraw(); }); }
 function pickSlideImg(i) { openMediaPicker(function (url) { HS.slides[i].img = url; redraw(); }); }
+function pickLogoImg() { openMediaPicker(function (url) { HS.logoUrl = url; redraw(); }); }
+function pickWmImg() { openMediaPicker(function (url) { HS.wmUrl = url; redraw(); }); }
 
 /* ---------- stock history (ledger) ---------- */
 var STM = {};
@@ -749,7 +753,7 @@ function adminHome() {
   function inp(i, k, l, ph, c) { return '<label class="' + (c || '') + '">' + l + '<input value="' + esc(HS.slides[i][k]) + '" placeholder="' + (ph || '') + '" oninput="hset(' + i + ',\'' + k + '\',this.value)"></label>'; }
   function hck(k, l) { return '<label style="flex-direction:row;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ow)"><input type="checkbox"' + (HS[k] ? ' checked' : '') + ' onchange="HS.' + k + '=this.checked?1:0" style="width:18px;height:18px;min-width:0">' + l + '</label>'; }
   return '<div class="top"><h1>' + t('หน้าแรก', 'Homepage') + '</h1><button class="btn p" onclick="hsave()">' + t('บันทึกหน้าแรก', 'Save homepage') + '</button></div>' + (sb() ? '' : '<div class="note">Local mode</div>') +
-    '<div class="fm" style="grid-template-columns:1fr">' + hck('logo', t('โชว์โลโก้', 'Show brand logo')) + hck('wm', t('โชว์ลายน้ำ', 'Show watermark')) + '<label>' + t('วินาทีต่อสไลด์', 'Seconds per slide') + '<input type="number" min="3" max="30" value="' + HS.secs + '" oninput="HS.secs=Math.min(30,Math.max(3,+this.value||7))"></label></div>' +
+    '<div class="fm" style="grid-template-columns:1fr">' + hck('logo', t('โชว์โลโก้', 'Show brand logo')) + hck('wm', t('โชว์ลายน้ำ', 'Show watermark')) + '<label>' + t('วินาทีต่อสไลด์', 'Seconds per slide') + '<input type="number" min="3" max="30" value="' + HS.secs + '" oninput="HS.secs=Math.min(30,Math.max(3,+this.value||7))"></label><label>' + t('รูปโลโก้', 'Logo image') + '<input value="' + esc(HS.logoUrl || '') + '" oninput="HS.logoUrl=this.value"></label><div style="display:flex;gap:6px"><button class="btn s" onclick="pickLogoImg()">' + t('จากคลัง', 'Library') + '</button></div><label>' + t('รูปลายน้ำ', 'Watermark image') + '<input value="' + esc(HS.wmUrl || '') + '" oninput="HS.wmUrl=this.value"></label><div style="display:flex;gap:6px"><button class="btn s" onclick="pickWmImg()">' + t('จากคลัง', 'Library') + '</button></div></div>' +
     s.map(function (x, i) { var u = simg(x.img); return '<div class="fm" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))"><div style="display:grid;gap:8px;align-content:start"><div class="pn" style="aspect-ratio:16/9">' + (u ? '<img src="' + u + '" alt="">' : '<span style="position:absolute;inset:0;display:grid;place-items:center;z-index:1;font-size:12px">' + t('ไม่มีรูป', 'No image') + '</span>') + '</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn s" onclick="document.getElementById(\'hf' + i + '\').click()">' + (u ? t('เปลี่ยน', 'Replace') : t('อัปโหลด', 'Upload')) + '</button><button class="btn s" onclick="pickSlideImg(' + i + ')">' + t('จากคลัง', 'Library') + '</button>' + (u ? '<button class="btn s d" onclick="hset(' + i + ',\'img\',\'\',1)">' + t('ลบ', 'Remove') + '</button>' : '') + '<input id="hf' + i + '" type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="hup(' + i + ',this.files)"></div></div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' + inp(i, 'h', t('หัวข้อ', 'Headline'), '', 'w2') + inp(i, 'sub', t('หัวข้อรอง', 'Subheadline'), '', 'w2') + inp(i, 'b1', t('ปุ่ม 1', 'Button 1')) + inp(i, 'l1', t('ลิงก์ 1', 'Link 1'), '#/shop') + inp(i, 'b2', t('ปุ่ม 2', 'Button 2')) + inp(i, 'l2', t('ลิงก์ 2', 'Link 2'), '#/shop') +
       '<div class="w2" style="display:flex;gap:8px"><button class="btn s" onclick="hmv(' + i + ',-1)"' + (i ? '' : ' disabled') + '>' + t('ขึ้น', 'Up') + '</button><button class="btn s" onclick="hmv(' + i + ',1)"' + (i < s.length - 1 ? '' : ' disabled') + '>' + t('ลง', 'Down') + '</button><button class="btn s d" onclick="hdel(' + i + ')"' + (s.length > 1 ? '' : ' disabled') + '>' + t('ลบ', 'Delete') + '</button></div></div></div>'; }).join('') + (s.length < 6 ? '<button class="btn" onclick="hadd()">' + t('เพิ่มสไลด์', 'Add slide') + '</button>' : '');
@@ -1049,7 +1053,12 @@ window.sbLogout = async function () { var c = sb(); if (c) await c.auth.signOut(
 
 /* ---------- misc views ---------- */
 function tcur() { CUR = CUR == 'THB' ? 'USD' : 'THB'; try { localStorage.setItem('jg_cur', CUR); } catch (e) {} go(); }
-function applyLogo() { cnt(); var cu = document.getElementById('cur'); if (cu) cu.textContent = CUR; applyHeader(); }
+function applyLogo() {
+  cnt(); var cu = document.getElementById('cur'); if (cu) cu.textContent = CUR;
+  var hl = document.getElementById('hlogo');
+  if (hl) { if (H.logo && H.logoUrl) { hl.src = H.logoUrl; hl.hidden = false; } else hl.hidden = true; }
+  applyHeader();
+}
 function hc() { var m = (location.hash || '').match(/^#\/shop\?cat=(.+)$/); if (m) F.cat = decodeURIComponent(m[1]); }
 
 /* แปล error ฝั่ง Auth + ล็อกปุ่มกันกดซ้ำ */
