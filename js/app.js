@@ -321,7 +321,7 @@ function prod(id) {
   var csMsg = (hasVS(p) || hasCS(p)) ? '<div class="sm" style="margin-top:6px">' + t('ชุดนี้เหลือ ', 'This variant: ') + csN + t(' ชิ้น · ทั้งหมด ', ' left · total ') + p.stock + t(' ชิ้น', '') + (hasVS(p) ? '<br>' + esc(vsText(p)) : '<br>' + esc(csText(p))) + '</div>' : '';
   function dt(t, x, d) { return '<details><summary>' + t + '</summary><p>' + esc(x || d || 'Details will be added soon.') + '</p></details>'; }
   return '<p class="sm" style="margin-bottom:20px"><a href="#/shop">Collection</a> / ' + esc(p.cat) + '</p><div class="pp">' + gal(p) +
-    '<div class="pi"><span class="sm">' + esc(p.coll) + '</span><div class="row"><h1 style="flex:1">' + esc(p.name) + '</h1>' + wishBtn(p.id) + '</div><div class="price">' + thb(p.price) + (p.compare > p.price ? '<s>' + thb(p.compare) + '</s>' : '') + '</div><p style="color:#b9b8ae">' + esc(p.desc) + '</p>' +
+    '<div class="pi"><span class="sm">' + esc(p.coll) + '</span><div class="row"><h1 style="flex:1">' + esc(p.name) + '</h1>' + wishBtn(p.id) + '</div><div class="price">' + thb(p.price) + (p.compare > p.price ? '<s>' + thb(p.compare) + '</s>' : '') + '</div><div class="sm" id="pd-left">' + t('คงเหลือทั้งหมด ', 'Total remaining ') + p.stock + t(' ชิ้น', ' pcs') + '</div><p style="color:#b9b8ae">' + esc(p.desc) + '</p>' +
     '<div><span class="sm">' + t('สี', 'Color') + ' — ' + esc(SEL.c) + '</span><div class="opt">' + p.colors.map(function (c) { return '<button class="sw" aria-label="' + esc(c) + '" aria-pressed="' + (c == SEL.c) + '" onclick="SEL.c=\'' + esc(c) + '\';GIDX[\'' + esc(p.id) + '\']=0;go()"><i style="background:' + swatch(c) + '"></i></button>'; }).join('') + '</div></div>' +
     '<div><span class="sm">' + t('ไซส์', 'Size') + '</span><div class="opt">' + p.sizes.map(function (s) { return '<button aria-pressed="' + (s == SEL.s) + '" onclick="SEL.s=\'' + esc(s) + '\';go()">' + esc(s) + '</button>'; }).join('') + '</div></div>' +
     '<div class="av ' + (csN <= 0 ? 'so' : a[0]) + '"><b></b>' + (csN <= 0 ? t('สีนี้หมด', 'Out in this color') : a[1]) + '</div>' + csMsg + '<div class="qty"><button aria-label="Less" onclick="Q=Math.max(1,Q-1);go()">–</button><span>' + Q + '</span><button aria-label="More" onclick="Q=Math.min(' + Math.max(1, csN) + ',Q+1);go()">+</button></div>' +
@@ -828,7 +828,7 @@ function jtDashboard() {
   var os = Object.keys(ORDS).map(function (k) { return ORDS[k]; }), sales = os.filter(function (o) { return !['cancelled', 'refunded'].includes(o.status); }).reduce(function (a, o) { return a + Number(o.total || 0); }, 0), pending = os.filter(function (o) { return ['new'].includes(o.status); }).length;
   return jtShell(t('แดชบอร์ด', 'Dashboard'), '#/admin/dashboard', '<div class="jt-grid"><div class="jt-kpi"><span>' + t('สินค้า', 'Products') + '</span><b>' + P.length + '</b></div><div class="jt-kpi"><span>' + t('ออเดอร์', 'Orders') + '</span><b>' + os.length + '</b></div><div class="jt-kpi"><span>' + t('ยอดขาย', 'Sales') + '</span><b>' + bt(sales) + '</b></div><div class="jt-kpi"><span>' + t('บทบาท', 'Role') + '</span><b style="font-size:20px">' + esc(roleLabel()) + '</b></div></div><div class="jt-panel"><span class="jgt-kpi">Mode</span><p>' + (sb() ? 'Supabase live: ' + esc(SB.url) + ' · ' + esc(SB_USER ? SB_USER.email : 'guest') : t('Local mode — ตั้งค่า Supabase ที่ SYSTEM › Supabase', 'Local mode — connect Supabase under SYSTEM › Supabase')) + '</p></div>');
 }
-function jtInventory() { return jtShell(t('สต็อก', 'Inventory'), '#/admin/inventory', '<div class="jt-panel"><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>SKU</th><th>' + t('สต็อก', 'Stock') + '</th><th>' + t('แยกสี', 'By color') + '</th><th>' + t('สถานะ', 'Status') + '</th></tr>' + P.map(function (p) { var n2 = Number(p.stock || 0); return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.sku) + '</td><td>' + n2 + '</td><td>' + esc(csText(p) || '-') + (vsText(p) ? '<br><span class="sm">' + esc(vsText(p)) + '</span>' : '') + '</td><td>' + (n2 <= 0 ? t('หมด', 'OUT') : n2 <= Number(p.low || 5) ? t('น้อย', 'LOW') : t('ปกติ', 'IN')) + '</td></tr>'; }).join('') + '</table></div>'); }
+function jtInventory() { return jtShell(t('สต็อก', 'Inventory'), '#/admin/inventory', '<div class="jt-panel"><div style="margin-bottom:12px"><button class="btn s" onclick="stockRefresh(true)">' + t('รีเฟรชยอดล่าสุด', 'Refresh') + '</button></div><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>SKU</th><th>' + t('คงเหลือ', 'Remaining') + '</th><th>' + t('แยกสี', 'By color') + '</th><th>' + t('สถานะ', 'Status') + '</th></tr>' + P.map(function (p) { var n2 = Number(p.stock || 0); return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.sku) + '</td><td><b>' + n2 + '</b></td><td>' + esc(csText(p) || '-') + (vsText(p) ? '<br><span class="sm">' + esc(vsText(p)) + '</span>' : '') + '</td><td>' + (n2 <= 0 ? t('หมด', 'OUT') : n2 <= Number(p.low || 5) ? t('น้อย', 'LOW') + ' (' + t('เตือนที่ ', 'low at ') + p.low + ')' : t('ปกติ', 'IN')) + '</td></tr>'; }).join('') + '</table></div>'); }
 function jtCustomers() {
   if (CUSTS.length) return jtShell(t('ลูกค้า', 'Customers'), '#/admin/customers', '<div class="jt-panel"><table class="tb"><tr><th>' + t('ชื่อ', 'Name') + '</th><th>Email</th><th>' + t('โทร', 'Phone') + '</th><th>' + t('ออเดอร์', 'Orders') + '</th><th>' + t('ยอดรวม', 'Total') + '</th></tr>' + CUSTS.map(function (c) { return '<tr><td>' + esc(c.name || '-') + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.phone || '-') + '</td><td>' + (c.orders_count || 0) + '</td><td>' + bt(c.total_spent || 0) + '</td></tr>'; }).join('') + '</table></div>');
   var map = {}; Object.keys(ORDS).forEach(function (k) { var o = ORDS[k], c = o.cust || {}; var key = String(c.email || 'guest:' + o.no).toLowerCase(); if (!map[key]) map[key] = { name: c.name || 'Guest', email: c.email || '', phone: c.phone || '', orders: 0, total: 0 }; map[key].orders++; map[key].total += Number(o.total || 0); });
@@ -1068,6 +1068,27 @@ function go() {
   a.innerHTML = isH ? v : '<div class="w">' + v + '</div>';
   if (isH) { heroInit(); dropInit(); }
   applyLogo();
+  // หน้าสินค้า/ร้าน/สต็อก: ดึงเลขล่าสุดจาก server ทุกครั้งที่ "เปิดเข้า" (กันเลขค้าง)
+  if (m || h.indexOf('#/shop') === 0 || h === '#/admin/inventory') {
+    if (stockRefresh._h !== h) { stockRefresh._h = h; stockRefresh(false, h); }
+  } else stockRefresh._h = null;
+}
+/* ดึงสต็อกล่าสุดจาก server; เปลี่ยนค่อย render ใหม่ */
+function stockSig() { return JSON.stringify(P.map(function (p) { return [p.id, p.stock, p.cstock, p.vstock]; })); }
+async function stockRefresh(manual, h) {
+  var c = sb(); if (!c) { if (manual) T(t('ยังไม่ต่อ Supabase', 'Not connected')); return; }
+  var before = stockSig(), hh = h || location.hash;
+  try {
+    var pr = await c.from('products').select('*').order('created_at');
+    if (!pr.data) return;
+    P = pr.data.map(function (r) {
+      return { id: r.id, name: r.name, sku: r.sku, barcode: r.barcode || '', cat: r.category, coll: r.collection, price: r.price, compare: r.compare_at, cost: r.cost, stock: r.stock, cstock: r.stock_by_color || {}, vstock: r.stock_by_variant || {}, low: r.low_threshold, status: r.status, featured: r.featured, colors: r.colors || ['Black'], sizes: r.sizes || ['One size'], tags: r.tags || '', desc: r.description || '', spec: r.spec || '', material: r.material || '', dims: r.dims || '', notes: r.notes || '' };
+    });
+    IM = {}; CIM = {}; pr.data.forEach(function (r) { if (r.image_urls && r.image_urls.length) IM[r.id] = r.image_urls; if (r.color_images && Object.keys(r.color_images).length) CIM[r.id] = r.color_images; });
+    imgFallback(); saveLocal();
+    if (stockSig() !== before) { if (location.hash === hh) go(); }
+    else if (manual) T(t('ข้อมูลล่าสุดแล้ว', 'Already up to date'));
+  } catch (e) { if (manual) T(String(e.message || e)); }
 }
 /* จำดราฟที่กรอกค้างไว้ก่อนสลับหน้า (ไม่กดเซฟก็ไม่หาย) */
 function preserveDrafts() {
