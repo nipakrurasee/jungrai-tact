@@ -423,16 +423,19 @@ function checkoutView() {
     '<div class="fm" style="grid-template-columns:1fr;position:sticky;top:80px"><h3 style="font-size:28px">' + t('สรุปคำสั่งซื้อ', 'Order summary') + '</h3>' + items + sumbox(calc(), 0) + '<button class="btn p" onclick="place()">' + t('สั่งซื้อ', 'Place order') + '</button></div></div>';
 }
 async function place() {
+  if (window._placing) return;
+  var done = function () { window._placing = false; };
+  window._placing = true;
   var g = function (i) { return (document.getElementById(i).value || '').trim(); }, em = g('em'), ph = g('ph').replace(/[\s-]/g, '').replace(/^\+66/, '0'), zp = g('zp'), err = null;
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) err = t('กรอกอีเมลให้ถูกต้อง', 'Enter a valid email address');
   else if (!g('nm')) err = t('กรอกชื่อ-นามสกุล', 'Enter your full name');
   else if (!/^0\d{8,9}$/.test(ph)) err = t('กรอกเบอร์ไทย เช่น 081 234 5678', 'Enter a Thai phone number, e.g. 081 234 5678');
   else if (!g('ad') || !g('sd') || !g('ds') || !g('pv')) err = t('กรอกที่อยู่ให้ครบ', 'Complete the address');
   else if (!/^\d{5}$/.test(zp)) err = t('รหัสไปรษณีย์ต้อง 5 หลัก', 'Postcode must be 5 digits');
-  if (err) { T(err); return; }
+  if (err) { T(err); done(); return; }
   var items = [], bad = 0;
   CART.forEach(function (l) { var p = gp(l.id); var ok = p ? vstockOf(p, l.c, l.s) : 0; if (!p || ok < l.qty) { bad = 1; return; } items.push({ id: p.id, name: p.name, sku: p.sku, c: l.c, s: l.s, qty: l.qty, price: p.price }); });
-  if (bad || !items.length) { T(t('บางชิ้นหมดแล้ว ปรับตะกร้าใหม่', 'Some items are no longer available.')); return; }
+  if (bad || !items.length) { T(t('บางชิ้นหมดแล้ว ปรับตะกร้าใหม่', 'Some items are no longer available.')); done(); return; }
   var r = calc(), now = new Date().toISOString();
   var o = { no: 'JT-' + Date.now().toString(36).toUpperCase(), at: now, cust: { email: em, name: g('nm'), phone: ph }, addr: { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp }, items: items, sub: r.sub, d: r.d, ship: r.ship, total: r.total, code: DC, pay: document.querySelector('input[name=pay]:checked').value, status: 'new', track: '', note: '', stockDone: 0, log: [{ t: now, s: 'Order placed' }] };
   ORDS[o.no] = o; try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
@@ -440,14 +443,14 @@ async function place() {
   if (c) {
     // 1. บันทึกออเดอร์ 2. ตัดสต็อกทันทีแบบ atomic (ของไม่พอ = ออเดอร์ถูก cancel อัตโนมัติ)
     var ins = await c.from('orders').insert({ order_no: o.no, customer: o.cust, address: o.addr, items: o.items, subtotal: o.sub, discount: o.d, shipping: o.ship, total: o.total, discount_code: o.code, payment_method: o.pay, status: o.status, tracking: o.track, note: o.note, stock_deducted: 0, log: o.log, user_id: (SB_USER && SB_USER.id) || null, customer_email: em.toLowerCase() });
-    if (ins.error) { delete ORDS[o.no]; T(t('สั่งไม่สำเร็จ: ', 'Order failed: ') + ins.error.message); return; }
+    if (ins.error) { delete ORDS[o.no]; T(t('สั่งไม่สำเร็จ: ', 'Order failed: ') + ins.error.message); done(); return; }
     var dd = await c.rpc('deduct_for_order', { p_no: o.no });
     if (dd.error || !dd.data || !dd.data.ok) {
       o.status = 'cancelled'; o.log.push({ t: new Date().toISOString(), s: 'Auto-cancelled: insufficient stock' });
       try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
       await loadSupabase();
       T(t('ของไม่พอแล้ว ออเดอร์ถูกยกเลิก ปรับตะกร้าใหม่', 'Insufficient stock — order cancelled'));
-      location.hash = '#/cart'; go(); return;
+      done(); location.hash = '#/cart'; go(); return;
     }
     o.stockDone = 1;
     try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
@@ -469,7 +472,7 @@ async function place() {
     try { await sb().from('profiles').update({ full_name: g('nm'), phone: ph, address: { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp } }).eq('id', SB_USER.id); } catch (e) {}
     try { if (SB_PROFILE) { SB_PROFILE.full_name = g('nm'); SB_PROFILE.phone = ph; SB_PROFILE.address = { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp }; } } catch (e) {}
   }
-  CART = []; DC = ''; csave(); try { sessionStorage.removeItem('jg_checkout'); } catch (e) {} location.hash = '#/done/' + o.no;
+  CART = []; DC = ''; csave(); try { sessionStorage.removeItem('jg_checkout'); } catch (e) {} done(); location.hash = '#/done/' + o.no;
 }
 function doneView(no) {
   var o = ORDS[no]; if (!o) return '<div class="top"><h1>' + t('ไม่พบคำสั่งซื้อ', 'Order not found') + '</h1></div>';
