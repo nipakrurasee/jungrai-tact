@@ -1199,6 +1199,17 @@ function preserveDrafts() {
   } catch (e) {}
 }
 function checkoutStash() { try { return JSON.parse(localStorage.getItem('jg_checkout') || 'null'); } catch (e) { return null; } }
+/* บันทึกดราฟทุกครั้งที่พิมพ์ (กันแท็บโดนล้างแล้วข้อมูลหาย) */
+var syncT = null;
+function syncSoon() { clearTimeout(syncT); syncT = setTimeout(function () { try { preserveDrafts(); } catch (e) {} }, 400); }
+if (!window._draftListener) {
+  window._draftListener = true;
+  ['input', 'change'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      try { if (e.target && e.target.closest && e.target.closest('#app')) syncSoon(); } catch (x) {}
+    });
+  });
+}
 window.addEventListener('hashchange', function () { preserveDrafts(); Q = 1; SEL = {}; hc(); go(); scrollTo(0, 0); });
 
 /* ---------- boot ---------- */
