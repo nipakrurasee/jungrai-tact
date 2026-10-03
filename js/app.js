@@ -527,7 +527,7 @@ function admin() {
 }
 function form() {
   var ro = myRole() === 'shop_admin' ? '<div class="note w4">Shop admin: แก้ได้เฉพาะ Stock / Low threshold / Status — ช่องอื่นจะถูกคงค่าเดิมตอนบันทึก</div>' : '';
-  var sec = function (n, t) { return '<h3 class="w4" style="font-size:24px;margin-top:8px"><span class="bd">' + n + '</span> ' + t + '</h3>'; };
+  var sec = function (n, t) { return '<h3 class="w4 row" style="font-size:24px;margin-top:8px;justify-content:flex-start"><span class="bd">' + n + '</span><span style="flex:1">' + t + '</span><button class="btn s p" onclick="commit()">' + t('บันทึก', 'Save') + '</button></h3>'; };
   return '<div class="fm" id="fm">' + ro +
     sec('1', t('ข้อมูลหลัก', 'Basic info')) +
     fld('name', t('ชื่อสินค้า *', 'Product name *'), '', 'w2') + fld('sku', 'SKU') + fld('barcode', 'Barcode') +
