@@ -47,6 +47,8 @@ declare
   kk text; cc2 text; vv int; tot int;
 begin
   perform set_config('app.stock_rpc', '1', true);
+  perform set_config('app.stock_reason', 'sale', true);
+  perform set_config('app.stock_order', p_no, true);
   select * into o from public.orders where order_no = p_no for update;
   if not found then
     return jsonb_build_object('ok', false, 'reason', 'not_found');
@@ -122,6 +124,8 @@ declare
   cs jsonb; vs jsonb; kk text; cc2 text; vv int; tot int;
 begin
   perform set_config('app.stock_rpc', '1', true);
+  perform set_config('app.stock_reason', 'restore', true);
+  perform set_config('app.stock_order', p_no, true);
   if not public.is_staff() then
     raise exception 'staff only';
   end if;

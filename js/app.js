@@ -534,7 +534,7 @@ function admin() {
         kv('ID', p.id) + kv('Barcode', p.barcode) + kv(t('หมวด', 'Category'), p.cat) + kv(t('คอลเลกชัน', 'Collection'), p.coll) +
         kv(t('ราคา', 'Price'), bt(p.price)) + kv(t('เทียบราคา', 'Compare-at'), p.compare ? bt(p.compare) : '') + kv(t('ต้นทุน', 'Cost'), p.cost ? bt(p.cost) : '') + kv(t('กำไร/ชิ้น', 'Margin'), (p.price - (p.cost || 0)) ? bt(p.price - (p.cost || 0)) : '') +
         kv(t('สต็อก', 'Stock'), p.stock + ' (' + t('เตือนที่ ', 'low at ') + p.low + ')' + (csText(p) ? ' — ' + csText(p) : '') + (vsText(p) ? ' — ' + vsText(p) : '')) + kv(t('สี', 'Colors'), p.colors) + kv(t('ไซส์', 'Sizes'), p.sizes) + kv('Tags', p.tags) +
-        '<div class="w4">' + kv(t('อธิบาย', 'Description'), p.desc) + kv('Spec', p.spec) + kv(t('วัสดุ', 'Material'), p.material) + kv(t('ขนาด', 'Dimensions'), p.dims) + kv(t('โน้ต', 'Notes'), p.notes) + '</div></div></td></tr>';
+        '<div class="w4">' + kv(t('อธิบาย', 'Description'), p.desc) + kv('Spec', p.spec) + kv(t('วัสดุ', 'Material'), p.material) + kv(t('ขนาด', 'Dimensions'), p.dims) + kv(t('โน้ต', 'Notes'), p.notes) + '</div><div class="w4"><button class="btn s" onclick="stHist(\'' + esc(p.id) + '\')">' + t('ประวัติสต็อก', 'Stock history') + '</button><div id="stm-' + esc(p.id) + '" style="margin-top:8px">' + stmRows(p.id) + '</div></div></div></td></tr>';
     }
   });
   return h + '</table></div>';
@@ -697,7 +697,21 @@ function pickMedia(i) { var m = MD[i]; if (m && mediaCb) { var cb = mediaCb; clo
 function pickProductImg() { sync(); if (EI.length >= 4) { T(t('ได้สูงสุด 4 รูป', 'Max 4 images')); return; } openMediaPicker(function (url) { EI.push({u:url,c:''}); redraw(); }); }
 function pickSlideImg(i) { openMediaPicker(function (url) { HS.slides[i].img = url; redraw(); }); }
 
-/* ---------- admin: homepage / sections ---------- */
+/* ---------- stock history (ledger) ---------- */
+var STM = {};
+function rsnLabel(r) { return { opening: t('ยอดยกมา', 'Opening'), import: t('นำเข้า', 'Import'), sale: t('ขาย', 'Sale'), restore: t('คืนของ', 'Restored'), adjust: t('ปรับมือ', 'Adjust') }[r] || r; }
+function stmRows(pid) {
+  var rows = STM[pid];
+  if (!rows) return '<span class="sm">' + t('กดปุ่มเพื่อดู', 'Press the button') + '</span>';
+  if (!rows.length) return '<span class="sm">' + t('ยังไม่มีประวัติ', 'No history') + '</span>';
+  return '<table class="tb"><tr><th>' + t('วัน', 'Date') + '</th><th>' + t('ที่มา', 'Reason') + '</th><th>' + t('ชุด', 'Variant') + '</th><th>' + t('ก่อน', 'Before') + '</th><th>' + t('หลัง', 'After') + '</th><th>±</th></tr>' + rows.map(function (m) { return '<tr><td>' + new Date(m.created_at).toLocaleString('en-GB') + '</td><td>' + esc(rsnLabel(m.reason)) + (m.order_no ? ' ' + esc(m.order_no) : '') + '</td><td>' + esc(m.variant_key ? m.variant_key.split('__').join('/') : '-') + '</td><td>' + (m.before_qty == null ? '-' : m.before_qty) + '</td><td>' + m.after_qty + '</td><td>' + (m.change_qty > 0 ? '+' : '') + m.change_qty + '</td></tr>'; }).join('') + '</table>';
+}
+window.stHist = async function (pid) {
+  var c = sb(); if (!c || !isStaff()) { T(t('ต้อง login เป็น staff', 'Staff only')); return; }
+  var r = await c.from('stock_moves').select('*').eq('product_id', pid).order('created_at', { ascending: false }).limit(50);
+  if (r.error) { T(r.error.message); return; }
+  STM[pid] = r.data || []; go();
+};
 function adminHome() {
   if (!HS) HS = JSON.parse(JSON.stringify(H)); var s = HS.slides;
   function inp(i, k, l, ph, c) { return '<label class="' + (c || '') + '">' + l + '<input value="' + esc(HS.slides[i][k]) + '" placeholder="' + (ph || '') + '" oninput="hset(' + i + ',\'' + k + '\',this.value)"></label>'; }
