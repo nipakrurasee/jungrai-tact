@@ -551,8 +551,7 @@ function form() {
     sec('2', t('ราคา', 'Pricing')) +
     fld('price', t('ราคาขาย (฿) *', 'Price (THB) *'), 'number') + fld('compare', t('ราคาขีดฆ่า', 'Compare-at'), 'number') + fld('cost', t('ต้นทุน', 'Cost'), 'number') + '<div class="w4 sm" style="align-self:end">' + t('กำไร/ชิ้น = ราคาขาย − ต้นทุน', 'Margin = price − cost') + '</div>' +
     sec('3', t('ตัวเลือก + สต็อก', 'Options + stock')) +
-    '<label class="w2">' + t('สี (คั่นจุลภาค)', 'Colors (comma)') + '<input data-k="colors" list="cl-suggest" value="' + esc(Array.isArray(E.colors) ? E.colors.join(', ') : E.colors) + '"></label><datalist id="cl-suggest"><option value="Black"><option value="Olive Drab"><option value="Sand"><option value="Concrete"><option value="RED"><option value="Green"><option value="Yellow"></datalist>' +
-    '<label class="w2">' + t('ไซส์ (คั่นจุลภาค)', 'Sizes (comma)') + '<input data-k="sizes" list="sz-suggest" value="' + esc(Array.isArray(E.sizes) ? E.sizes.join(', ') : E.sizes) + '"></label><datalist id="sz-suggest"><option value="One size"><option value="S"><option value="M"><option value="L"><option value="XL"></datalist>' +
+    optChips() +
     fld('stock', t('สต็อกรวม', 'Total stock'), 'number') + fld('low', t('เตือนเมื่อเหลือ', 'Low threshold'), 'number') +
     '<div class="w4 sm">' + t('ถ้ากรอกสต็อกแยกสี/ไซส์ด้านล่าง ยอดรวมจะคำนวณเอง', 'Fill per-color/size below and total is auto-calculated') + '</div>' + csui() + vsui() + fld('tags', 'Tags', '', 'w4') +
     sec('4', t('รายละเอียด', 'Details')) +
@@ -568,7 +567,8 @@ async function commit() {
   var eid = o._id; delete o._id;
   if (eid && i >= 0) { var ri = P.findIndex(function (x) { return x.id === eid; }); if (ri > -1) i = ri; }
   if (i >= 0 && (!P[i] || P[i].id !== eid)) i = -1; // สินค้าถูกลบระหว่างดราฟ -> บันทึกเป็นตัวใหม่
-  document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k, v = e.value; if (['price', 'compare', 'cost', 'stock', 'low'].indexOf(k) > -1) v = Math.max(0, parseInt(v, 10) || 0); else if (k == 'colors' || k == 'sizes') v = v.split(',').map(function (x) { return x.trim(); }).filter(Boolean); else if (k == 'featured') v = v == '1' ? 1 : 0; o[k] = v; });
+  document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k, v = e.value; if (k == 'colors' || k == 'sizes') return; if (['price', 'compare', 'cost', 'stock', 'low'].indexOf(k) > -1) v = Math.max(0, parseInt(v, 10) || 0); else if (k == 'featured') v = v == '1' ? 1 : 0; o[k] = v; });
+  if (!Array.isArray(o.colors)) o.colors = []; if (!Array.isArray(o.sizes)) o.sizes = [];
   var csm = {}; document.querySelectorAll('#fm [data-cs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) csm[e.dataset.cs] = v; });
   o.cstock = csm;
   var vsm = {}; document.querySelectorAll('#fm [data-vs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) vsm[e.getAttribute('data-vs')] = v; });
@@ -603,7 +603,30 @@ async function arch(i) { if (!isStaff()) { T('ต้อง login เป็น st
 async function del(i) { if (!isOwner()) { T('ลบสินค้าได้เฉพาะ owner'); return; } if (!confirm(t('ลบ "', 'Delete "') + P[i].name + '"?')) return;   var id = P[i].id; P.splice(i, 1); delete IM[id]; delete CIM[id]; saveLocal(); await dbDeleteProduct(id); go(); }
 
 /* ---------- images (Storage-first) ---------- */
-function sync() { document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k; E[k] = k == 'featured' ? (e.value == '1' ? 1 : 0) : e.value; }); }
+function sync() { document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k; if (k == 'colors' || k == 'sizes') return; E[k] = k == 'featured' ? (e.value == '1' ? 1 : 0) : e.value; }); }
+function colorSuggest() {
+  var seen = {}, out = [];
+  (P || []).forEach(function (p) { (p.colors || []).forEach(function (c) { if (!seen[c]) { seen[c] = 1; out.push(c); } }); });
+  ['Black', 'Olive Drab', 'Sand', 'Concrete', 'White', 'Navy', 'Gray', 'Brown', 'Green', 'RED', 'Yellow', 'Blue', 'Camouflage'].forEach(function (c) { if (!seen[c]) { seen[c] = 1; out.push(c); } });
+  return out.filter(function (c) { return (E.colors || []).indexOf(c) < 0; });
+}
+function sizeSuggest() {
+  var seen = {}, out = [];
+  (P || []).forEach(function (p) { (p.sizes || []).forEach(function (s) { if (!seen[s]) { seen[s] = 1; out.push(s); } }); });
+  ['One size', 'S', 'M', 'L', 'XL', 'XXL'].forEach(function (s) { if (!seen[s]) { seen[s] = 1; out.push(s); } });
+  return out.filter(function (s) { return (E.sizes || []).indexOf(s) < 0; });
+}
+function optChips() {
+  function chips(arr, del) { return arr.map(function (x) { return '<span class="bd" style="display:inline-flex;gap:6px;align-items:center;padding:4px 6px 4px 10px">' + esc(x) + ' <button class="btn s" style="padding:2px 8px" onclick="' + del + '(\'' + esc(x).replace(/'/g, "\\'") + '\')">✕</button></span>'; }).join(''); }
+  return '<div class="w2"><span>' + t('สี', 'Colors') + ' (' + (E.colors || []).length + ')</span><div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">' + chips(E.colors || [], 'colDel') + '</div><div style="display:flex;gap:6px"><select id="col-add" onchange="colAdd(this.value);this.value=\'\'"><option value="">+ ' + t('เลือกสี', 'Pick color') + '</option>' + colorSuggest().map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('') + '</select><input id="col-custom" placeholder="' + t('หรือพิมพ์สีใหม่', 'or type new') + '"><button class="btn s" onclick="colCustom()">+</button></div></div>' +
+    '<div class="w2"><span>' + t('ไซส์', 'Sizes') + ' (' + (E.sizes || []).length + ')</span><div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">' + chips(E.sizes || [], 'sizeDel') + '</div><div style="display:flex;gap:6px"><select id="sz-add" onchange="sizeAdd(this.value);this.value=\'\'"><option value="">+ ' + t('เลือกไซส์', 'Pick size') + '</option>' + sizeSuggest().map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('') + '</select><input id="sz-custom" placeholder="' + t('หรือพิมพ์ไซส์ใหม่', 'or type new') + '"><button class="btn s" onclick="sizeCustom()">+</button></div></div>';
+}
+function colAdd(v) { v = (v || '').trim(); if (!v) return; sync(); if (E.colors.indexOf(v) < 0) E.colors.push(v); redraw(); }
+function colCustom() { var el = document.getElementById('col-custom'); colAdd(el ? el.value : ''); }
+function colDel(c) { sync(); E.colors = E.colors.filter(function (x) { return x !== c; }); if (E.cstock) delete E.cstock[c]; redraw(); }
+function sizeAdd(v) { v = (v || '').trim(); if (!v) return; sync(); if (E.sizes.indexOf(v) < 0) E.sizes.push(v); redraw(); }
+function sizeCustom() { var el = document.getElementById('sz-custom'); sizeAdd(el ? el.value : ''); }
+function sizeDel(s) { sync(); E.sizes = E.sizes.filter(function (x) { return x !== s; }); redraw(); }
 function redraw() { var y = scrollY; go(); scrollTo(0, y); }
 function ecols() {
   var v = E.colors;
