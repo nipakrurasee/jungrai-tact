@@ -57,6 +57,8 @@ create or replace function public.check_product_edit()
 returns trigger language plpgsql as $$
 declare r text;
 begin
+  -- งานภายในของ stock RPC: ปล่อยผ่าน
+  if current_setting('app.stock_rpc', true) = '1' then return new; end if;
   -- SQL Editor / ต่อ DB ตรง (ไม่มี JWT): ปล่อยผ่าน ถือว่ามี DB password แล้ว
   if current_setting('request.jwt.claims', true) is null then return new; end if;
   r := public.my_role();

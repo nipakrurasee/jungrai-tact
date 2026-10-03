@@ -4,7 +4,38 @@
 -- deduct_for_order: ใครก็เรียกได้ แต่ตัดให้เฉพาะออเดอร์จริง
 --   ครั้งเดียว (เช็กของพอแบบ lock แถว, ไม่พอ = ตีกลับ + cancel)
 -- restore_for_order: staff เท่านั้น (ยกเลิกออเดอร์แล้วคืนของ)
+-- หมายเหตุ: trigger กันราคา (check_product_edit) ต้องปล่อยผ่าน
+--   งานเขียนภายในของ RPC นี้ (flag app.stock_rpc)
 -- ============================================================
+
+-- ---------- 0. เปิดทางให้ RPC เขียน products ได้ ----------
+create or replace function public.check_product_edit()
+returns trigger language plpgsql as $$
+declare r text;
+begin
+  -- งานภายในของ stock RPC: ปล่อยผ่าน
+  if current_setting('app.stock_rpc', true) = '1' then return new; end if;
+  -- SQL Editor / ต่อ DB ตรง (ไม่มี JWT): ปล่อยผ่าน ถือว่ามี DB password แล้ว
+  if current_setting('request.jwt.claims', true) is null then return new; end if;
+  r := public.my_role();
+  if r = 'owner' then return new; end if;
+  if r = 'shop_admin' then
+    if new.price is distinct from old.price
+      or new.compare_at is distinct from old.compare_at
+      or new.cost is distinct from old.cost
+      or new.name is distinct from old.name
+      or new.sku is distinct from old.sku
+      or new.category is distinct from old.category
+      or new.collection is distinct from old.collection
+      or new.featured is distinct from old.featured
+      or new.colors is distinct from old.colors
+      or new.sizes is distinct from old.sizes then
+      raise exception 'shop_admin แก้ได้เฉพาะ stock / low_threshold / status เท่านั้น';
+    end if;
+    return new;
+  end if;
+  raise exception 'no permission';
+end $$;
 
 -- ---------- deduct ----------
 create or replace function public.deduct_for_order(p_no text)
@@ -15,6 +46,7 @@ declare
   st int; cs jsonb; vs jsonb; avail int;
   kk text; cc2 text; vv int; tot int;
 begin
+  perform set_config('app.stock_rpc', '1', true);
   select * into o from public.orders where order_no = p_no for update;
   if not found then
     return jsonb_build_object('ok', false, 'reason', 'not_found');
@@ -89,6 +121,7 @@ declare
   pid text; cc text; ss text; q int; k text;
   cs jsonb; vs jsonb; kk text; cc2 text; vv int; tot int;
 begin
+  perform set_config('app.stock_rpc', '1', true);
   if not public.is_staff() then
     raise exception 'staff only';
   end if;
