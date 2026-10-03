@@ -77,11 +77,11 @@ select id, '', null, stock, stock, 'opening', 'system' from public.products
 where not exists (select 1 from public.stock_moves sm where sm.product_id = public.products.id and sm.reason = 'opening') and (stock_by_variant is null or stock_by_variant = '{}')
   and (stock_by_color is null or stock_by_color = '{}');
 insert into public.stock_moves (product_id, variant_key, before_qty, after_qty, change_qty, reason, actor)
-select id, k, null, (value)::int, (value)::int, 'opening', 'system'
+select id, key, null, (value)::int, (value)::int, 'opening', 'system'
 from public.products, jsonb_each_text(stock_by_color)
 where not exists (select 1 from public.stock_moves sm where sm.product_id = public.products.id and sm.reason = 'opening') and stock_by_color is not null and stock_by_color <> '{}'
   and (stock_by_variant is null or stock_by_variant = '{}');
 insert into public.stock_moves (product_id, variant_key, before_qty, after_qty, change_qty, reason, actor)
-select id, k, null, (value)::int, (value)::int, 'opening', 'system'
+select id, key, null, (value)::int, (value)::int, 'opening', 'system'
 from public.products, jsonb_each_text(stock_by_variant)
 where not exists (select 1 from public.stock_moves sm where sm.product_id = public.products.id and sm.reason = 'opening') and stock_by_variant is not null and stock_by_variant <> '{}';
