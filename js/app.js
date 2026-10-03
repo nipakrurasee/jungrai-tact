@@ -505,12 +505,11 @@ function dropInit() {
 var PO = '';
 function fld(k, l, t, c) { var v = E[k]; if (Array.isArray(v)) v = v.join(', '); return '<label class="' + (c || '') + '">' + l + (t == 'ta' ? '<textarea data-k="' + k + '">' + esc(v) + '</textarea>' : '<input data-k="' + k + '" type="' + (t || 'text') + '" value="' + esc(v) + '">') + '</label>'; }
 function admin() {
-  var h = '<div class="top"><h1>' + t('สินค้า', 'Products') + '</h1>' + (isOwner() ? '<button class="btn p" onclick="edit(-1)">' + t('เพิ่มสินค้า', 'New product') + '</button>' : '<span class="sm">' + esc(roleLabel()) + (myRole() === 'shop_admin' ? t(' · แก้ได้เฉพาะสต็อก', ' · stock only') : '') + '</span>') + '</div>' + (sb() ? (SB_USER ? '<p class="sm">Supabase · ' + esc(SB_USER.email) + ' · ' + esc(roleLabel()) + ' · <a href="#" onclick="sbLogout();return false" style="text-decoration:underline">logout</a></p>' : '<p class="sm">Supabase connected · <a href="#/admin/system/supabase" style="text-decoration:underline">' + t('login เพื่อเขียนข้อมูล', 'login to edit') + '</a></p>') : '<div class="note">' + t('Local mode — ต่อ Supabase ที่เมนู SYSTEM › Supabase', 'Local mode — connect Supabase under SYSTEM › Supabase') + '</div>');
-  if (E) h += form();
+  var h = '<div class="top"><h1>' + t('สินค้า', 'Products') + '</h1>' + (isOwner() ? '<button class="btn p" onclick="goNew()">' + t('เพิ่มสินค้า', 'New product') + '</button>' : '<span class="sm">' + esc(roleLabel()) + (myRole() === 'shop_admin' ? t(' · แก้ได้เฉพาะสต็อก', ' · stock only') : '') + '</span>') + '</div>' + (sb() ? (SB_USER ? '<p class="sm">Supabase · ' + esc(SB_USER.email) + ' · ' + esc(roleLabel()) + ' · <a href="#" onclick="sbLogout();return false" style="text-decoration:underline">logout</a></p>' : '<p class="sm">Supabase connected · <a href="#/admin/system/supabase" style="text-decoration:underline">' + t('login เพื่อเขียนข้อมูล', 'login to edit') + '</a></p>') : '<div class="note">' + t('Local mode — ต่อ Supabase ที่เมนู SYSTEM › Supabase', 'Local mode — connect Supabase under SYSTEM › Supabase') + '</div>');
   h += '<div class="sc"><table class="tb"><tr><th>' + t('สินค้า', 'Product') + '</th><th>SKU</th><th>' + t('ราคา', 'Price') + '</th><th>' + t('สต็อก', 'Stock') + '</th><th>' + t('สถานะ', 'Status') + '</th><th></th></tr>';
   P.forEach(function (p, i) {
     var open = PO === p.id;
-    h += '<tr style="cursor:pointer" onclick="PO=PO===\'' + p.id + '\'?\'\':\'' + p.id + '\';go()"><td>' + esc(p.name) + (p.featured ? ' <span class="sm">★</span>' : '') + '</td><td>' + esc(p.sku) + '</td><td>' + thb(p.price) + '</td><td' + (p.stock <= p.low ? ' style="color:var(--sd)"' : '') + '>' + p.stock + '</td><td><span class="bd ' + p.status + '">' + p.status + '</span></td><td style="text-align:right;white-space:nowrap"><button class="btn s" onclick="event.stopPropagation();edit(' + i + ')">' + (myRole() === 'shop_admin' ? t('สต็อก', 'Stock') : t('แก้', 'Edit')) + '</button>' + (isStaff() ? ' <button class="btn s" onclick="event.stopPropagation();arch(' + i + ')">' + (p.status == 'archived' ? t('กู้คืน', 'Restore') : t('เก็บ', 'Archive')) + '</button>' : '') + (isOwner() ? ' <button class="btn s d" onclick="event.stopPropagation();del(' + i + ')">' + t('ลบ', 'Delete') + '</button>' : '') + '</td></tr>';
+    h += '<tr style="cursor:pointer" onclick="PO=PO===\'' + p.id + '\'?\'\':\'' + p.id + '\';go()"><td>' + esc(p.name) + (p.featured ? ' <span class="sm">★</span>' : '') + '</td><td>' + esc(p.sku) + '</td><td>' + thb(p.price) + '</td><td' + (p.stock <= p.low ? ' style="color:var(--sd)"' : '') + '>' + p.stock + '</td><td><span class="bd ' + p.status + '">' + p.status + '</span></td><td style="text-align:right;white-space:nowrap"><button class="btn s" onclick="event.stopPropagation();goEdit(\'' + esc(p.id) + '\')">' + (myRole() === 'shop_admin' ? t('สต็อก', 'Stock') : t('แก้', 'Edit')) + '</button>' + (isStaff() ? ' <button class="btn s" onclick="event.stopPropagation();arch(' + i + ')">' + (p.status == 'archived' ? t('กู้คืน', 'Restore') : t('เก็บ', 'Archive')) + '</button>' : '') + (isOwner() ? ' <button class="btn s d" onclick="event.stopPropagation();del(' + i + ')">' + t('ลบ', 'Delete') + '</button>' : '') + '</td></tr>';
     if (open) {
       var allImgs = (IM[p.id] || []).map(function (u) { return { u: u, c: '' }; });
       Object.keys(CIM[p.id] || {}).forEach(function (col) { (CIM[p.id][col] || []).forEach(function (u) { allImgs.push({ u: u, c: col }); }); });
@@ -546,7 +545,13 @@ function form() {
     sec('5', t('รูปภาพ (สูงสุด 4)', 'Images (max 4)')) + imgui() +
     '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">' + t('บันทึกสินค้า', 'Save product') + '</button><button class="btn" onclick="cancelEdit()">' + t('ยกเลิก', 'Cancel') + '</button></div></div>';
 }
-function edit(i) { E = i < 0 ? mk('new-' + Date.now().toString(36), '', 'Apparel', 'Core', 0, 0, 0, 0, ['Black'], ['One size'], 0, '') : JSON.parse(JSON.stringify(P[i])); E._i = i; E._id = i < 0 ? E.id : P[i].id; EI = (IM[E.id] || []).map(function (u) { return { u: u, c: '' }; }); Object.keys(CIM[E.id] || {}).forEach(function (col) { (CIM[E.id][col] || []).forEach(function (u) { EI.push({ u: u, c: col }); }); }); if (i < 0) { E.status = 'draft'; E.sku = ''; } go(); var f = $('#fm'); f && f.scrollIntoView({ behavior: 'smooth' }); }
+function loadEdit(i) { E = i < 0 ? mk('new-' + Date.now().toString(36), '', 'Apparel', 'Core', 0, 0, 0, 0, ['Black'], ['One size'], 0, '') : JSON.parse(JSON.stringify(P[i])); E._i = i; E._id = i < 0 ? E.id : P[i].id; EI = (IM[E.id] || []).map(function (u) { return { u: u, c: '' }; }); Object.keys(CIM[E.id] || {}).forEach(function (col) { (CIM[E.id][col] || []).forEach(function (u) { EI.push({ u: u, c: col }); }); }); if (i < 0) { E.status = 'draft'; E.sku = ''; } }
+function edit(i) { loadEdit(i); go(); var f = $('#fm'); f && f.scrollIntoView({ behavior: 'smooth' }); }
+function goNew() { if (!isOwner()) { T(t('เพิ่มสินค้าได้เฉพาะ owner', 'Owner only')); return; } loadEdit(-1); location.hash = '#/admin/products/new'; }
+function goEdit(id) { var i = P.findIndex(function (x) { return x.id === id; }); if (i < 0) { T(t('ไม่พบสินค้า', 'Product not found')); return; } loadEdit(i); location.hash = '#/admin/products/edit/' + encodeURIComponent(id); }
+function adminEditView(isNew) {
+  return '<div class="top"><h1>' + (isNew ? t('เพิ่มสินค้า', 'New product') : t('แก้ไขสินค้า', 'Edit product')) + '</h1><a class="sm" href="#/admin/products">' + t('กลับไปรายการ', 'Back to list') + '</a></div>' + form();
+}
 async function commit() {
   if (!isStaff()) { T('ต้อง login เป็น staff'); return; }
   if (!isOwner() && myRole() === 'shop_admin' && arguments.length === 0) { /* stock-only enforced below */ }
@@ -585,7 +590,7 @@ async function commit() {
   CIM[o.id] = {}; EI.filter(function (e) { return e.c; }).forEach(function (e) { (CIM[o.id][e.c] = CIM[o.id][e.c] || []).push(e.u); });
   if (!Object.keys(CIM[o.id]).length) delete CIM[o.id];
   saveLocal(); await dbUpsertProduct(o);
-  E = null; EI = []; clearDraft(); T(t('บันทึกแล้ว', 'Saved')); go();
+  E = null; EI = []; clearDraft(); T(t('บันทึกแล้ว', 'Saved')); location.hash = '#/admin/products';
 }
 async function arch(i) { if (!isStaff()) { T('ต้อง login เป็น staff'); return; } P[i].status = P[i].status == 'archived' ? 'draft' : 'archived'; saveLocal(); await dbUpsertProduct(P[i]); go(); }
 async function del(i) { if (!isOwner()) { T('ลบสินค้าได้เฉพาะ owner'); return; } if (!confirm(t('ลบ "', 'Delete "') + P[i].name + '"?')) return;   var id = P[i].id; P.splice(i, 1); delete IM[id]; delete CIM[id]; saveLocal(); await dbDeleteProduct(id); go(); }
@@ -606,7 +611,7 @@ function loadDraft() {
   } catch (e) {}
   return false;
 }
-function cancelEdit() { E = null; EI = []; clearDraft(); go(); }
+function cancelEdit() { E = null; EI = []; clearDraft(); location.hash = '#/admin/products'; }
 function colorSuggest() {
   var seen = {}, out = [];
   (P || []).forEach(function (p) { (p.colors || []).forEach(function (c) { if (!seen[c]) { seen[c] = 1; out.push(c); } }); });
@@ -1118,7 +1123,7 @@ function deny(page) { var needOwner = page === 'Owner only'; return jtShell(need
 /* ---------- router ---------- */
 function go() {
   clearInterval(HT); clearInterval(HT2); fixPG();
-  var h = location.hash || '#/', m = h.match(/^#\/p\/(.+)$/), m2 = h.match(/^#\/done\/(.+)$/), a = $('#app'), isH = h == '#/' || h == '#';
+  var h = location.hash || '#/', m = h.match(/^#\/p\/(.+)$/), m2 = h.match(/^#\/done\/(.+)$/), mEdit = null, a = $('#app'), isH = h == '#/' || h == '#';
   document.querySelector('main').className = isH ? 'h' : '';
   var v;
   if (h === '#/account/orders') v = myOrdersView();
@@ -1126,6 +1131,12 @@ function go() {
   else if (h === '#/signup') v = signupView();
   else if (h === '#/admin' || h === '#/admin/dashboard') v = isStaff() ? jtDashboard() : deny('Staff only');
   else if (h === '#/admin/products') v = isStaff() ? jtShell(t('สินค้า', 'Products'), '#/admin/products', admin()) : deny('Staff only');
+  else if (h === '#/admin/products/new') { if (!E || E._i >= 0) loadEdit(-1); v = isOwner() ? jtShell(t('เพิ่มสินค้า', 'New product'), '#/admin/products', adminEditView(true)) : deny('Owner only'); }
+  else if ((mEdit = h.match(/^#\/admin\/products\/edit\/(.+)$/))) {
+    var eid = decodeURIComponent(mEdit[1]);
+    if (!E || E._id !== eid) { var eii = P.findIndex(function (x) { return x.id === eid; }); if (eii > -1) loadEdit(eii); }
+    v = (isStaff() && E) ? jtShell(t('แก้ไขสินค้า', 'Edit product'), '#/admin/products', adminEditView(false)) : deny('Staff only');
+  }
   else if (h === '#/admin/inventory') v = isStaff() ? jtInventory() : deny('Staff only');
   else if (h === '#/admin/orders') v = isStaff() ? jtShell(t('คำสั่งซื้อ', 'Orders'), '#/admin/orders', adminOrd()) : deny('Staff only');
   else if (h === '#/admin/customers') v = isStaff() ? jtCustomers() : deny('Staff only');
