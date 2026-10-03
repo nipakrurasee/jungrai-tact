@@ -37,6 +37,7 @@ vercel.json / netlify.toml  # รองรับ SPA routing
 11. New query อีกอัน → ก็อป `supabase/migration_variant_stock.sql` → **Run** (สต็อกแยกสี×ไซส์)
 12. New query อีกอัน → ก็อป `supabase/migration_stock_rpc.sql` → **Run** (ตัด/คืนสต็อกทันทีแบบ atomic ผูกออเดอร์)
 13. รัน `supabase/migration_stock_rpc.sql` ซ้ำอีกรอบหลังอัปเดตนี้ (trigger เปิดทางให้ RPC) + รัน `supabase/migration_stock_moves.sql` → **Run** (สมุดบัญชีสต็อก ดูประวัติในรายละเอียดสินค้า)
+14. New query → ก็อป `supabase/migration_cover_url.sql` → **Run** (รูปปกหน้าร้าน)
 5. เมนู **Storage** → ตรวจว่ามี bucket `product-images` + `slide-images` (สร้างจาก SQL แล้ว, เป็น public)
 6. เมนู **Project Settings → API** → ก็อป `Project URL` + `anon public key`
 7. เมนู **Authentication → Users → Add user** → เพิ่มอีเมล owner + shop_admin + ทดสอบ member

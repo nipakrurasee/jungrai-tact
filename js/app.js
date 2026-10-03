@@ -3,7 +3,7 @@
 var CM = { 'Olive Drab': '#5a5d3a', 'Sand': '#c2b28f', 'Black': '#1d1d1b', 'Concrete': '#8a8b86' };
 var CAT = ['Apparel', 'Field Gear', 'Accessories', 'Patches'];
 function mk(id, n, cat, col, pr, cp, cost, st, cl, sz, ft, d) {
-  return { id: id, name: n, sku: id.toUpperCase(), barcode: '', cat: cat, coll: col, price: pr, compare: cp, cost: cost, stock: st, cstock: {}, vstock: {}, low: 5, status: 'active', featured: ft, colors: cl, sizes: sz, tags: '', desc: d, material: '', dims: '', spec: '', notes: '' };
+  return { id: id, name: n, sku: id.toUpperCase(), barcode: '', cat: cat, coll: col, price: pr, compare: cp, cost: cost, stock: st, cstock: {}, vstock: {}, cover: '', low: 5, status: 'active', featured: ft, colors: cl, sizes: sz, tags: '', desc: d, material: '', dims: '', spec: '', notes: '' };
 }
 var A = ['Olive Drab', 'Sand', 'Black'], S = ['S', 'M', 'L', 'XL'];
 var SEED_PRODUCTS = [
@@ -118,7 +118,9 @@ function art(p, c) {
   return '<svg viewBox="0 0 400 480" aria-hidden="true" fill="' + h + '" stroke="#0a0a09" stroke-width="2">' + s + '</svg>';
 }
 function pic(p, i, c) {
-  var m = allImgs(p.id), u = m && m[i];
+  var m = allImgs(p.id);
+  if (p.cover && m.indexOf(p.cover) > 0) { m = [p.cover].concat(m.filter(function (u) { return u !== p.cover; })); }
+  var u = m && m[i];
   if (u && (/^(https?:|data:image|\.\/|img\/|\/)/.test(u) || /\.(jpg|jpeg|png|webp|svg|gif)(\?.*)?$/i.test(u))) return '<img src="' + u + '" alt="' + esc(p.name) + '" loading="lazy">';
   return art(p, c);
 }
@@ -184,6 +186,7 @@ function imgFallback() {
   (P || []).forEach(function (p) {
     var hasShared = IM[p.id] && IM[p.id].length, hasColor = CIM[p.id] && Object.keys(CIM[p.id]).some(function (k) { return (CIM[p.id][k] || []).length; });
     if (!hasShared && !hasColor) IM[p.id] = ['img/products/' + p.id + '.svg'];
+    if (!p.cover) { var a = allImgs(p.id); if (a.length) p.cover = a[0]; }
   });
 }
 function saveLocal() {
@@ -199,7 +202,7 @@ async function loadSupabase() {
     var pr = await c.from('products').select('*').order('created_at');
     if (pr.data && pr.data.length) {
       P = pr.data.map(function (r) {
-        return { id: r.id, name: r.name, sku: r.sku, barcode: r.barcode || '', cat: r.category, coll: r.collection, price: r.price, compare: r.compare_at, cost: r.cost, stock: r.stock, cstock: r.stock_by_color || {}, vstock: r.stock_by_variant || {}, low: r.low_threshold, status: r.status, featured: r.featured, colors: r.colors || ['Black'], sizes: r.sizes || ['One size'], tags: r.tags || '', desc: r.description || '', spec: r.spec || '', material: r.material || '', dims: r.dims || '', notes: r.notes || '' };
+        return { id: r.id, name: r.name, sku: r.sku, barcode: r.barcode || '', cat: r.category, coll: r.collection, price: r.price, compare: r.compare_at, cost: r.cost, stock: r.stock, cstock: r.stock_by_color || {}, vstock: r.stock_by_variant || {}, cover: r.cover_url || '', low: r.low_threshold, status: r.status, featured: r.featured, colors: r.colors || ['Black'], sizes: r.sizes || ['One size'], tags: r.tags || '', desc: r.description || '', spec: r.spec || '', material: r.material || '', dims: r.dims || '', notes: r.notes || '' };
       });
       IM = {}; CIM = {}; pr.data.forEach(function (r) { if (r.image_urls && r.image_urls.length) IM[r.id] = r.image_urls; if (r.color_images && Object.keys(r.color_images).length) CIM[r.id] = r.color_images; });
       imgFallback();
@@ -251,7 +254,7 @@ async function loadSupabase() {
 }
 async function dbUpsertProduct(o) {
   var c = sb(); if (!c) return;
-  await c.from('products').upsert({ id: o.id, name: o.name, sku: o.sku, barcode: o.barcode, category: o.cat, collection: o.coll, price: o.price, compare_at: o.compare, cost: o.cost, stock: o.stock, stock_by_color: o.cstock || {}, stock_by_variant: o.vstock || {}, low_threshold: o.low, status: o.status, featured: o.featured ? 1 : 0, colors: o.colors, sizes: o.sizes, tags: o.tags, description: o.desc, spec: o.spec, material: o.material, dims: o.dims, notes: o.notes, image_urls: IM[o.id] || [], color_images: CIM[o.id] || {} }, { onConflict: 'id' });
+  await c.from('products').upsert({ id: o.id, name: o.name, sku: o.sku, barcode: o.barcode, category: o.cat, collection: o.coll, price: o.price, compare_at: o.compare, cost: o.cost, stock: o.stock, stock_by_color: o.cstock || {}, stock_by_variant: o.vstock || {}, cover_url: o.cover || '', low_threshold: o.low, status: o.status, featured: o.featured ? 1 : 0, colors: o.colors, sizes: o.sizes, tags: o.tags, description: o.desc, spec: o.spec, material: o.material, dims: o.dims, notes: o.notes, image_urls: IM[o.id] || [], color_images: CIM[o.id] || {} }, { onConflict: 'id' });
 }
 async function dbDeleteProduct(id) { var c = sb(); if (!c) return; await c.from('products').delete().eq('id', id); }
 async function dbSaveOrder(o) {
@@ -599,6 +602,7 @@ async function commit() {
   }
   if (i < 0 && myRole() === 'shop_admin') { T('สร้างสินค้าได้เฉพาะ owner'); return; }
   if (i < 0) P.push(o); else { o.id = P[i].id; P[i] = o; }
+  o.cover = (EI[0] && EI[0].u) || ''; // รูปแรก = ปกหน้าร้านเสมอ
   IM[o.id] = EI.filter(function (e) { return !e.c; }).map(function (e) { return e.u; }).slice(0, 4);
   CIM[o.id] = {}; EI.filter(function (e) { return e.c; }).forEach(function (e) { (CIM[o.id][e.c] = CIM[o.id][e.c] || []).push(e.u); });
   if (!Object.keys(CIM[o.id]).length) delete CIM[o.id];
