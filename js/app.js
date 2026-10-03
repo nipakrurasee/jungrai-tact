@@ -453,35 +453,11 @@ async function place() {
   ORDS[o.no] = o; try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
   var c = sb();
   if (c) {
-    // 1. บันทึกออเดอร์ 2. ตัดสต็อกทันทีแบบ atomic (ของไม่พอ = ออเดอร์ถูก cancel อัตโนมัติ)
+    // บันทึกออเดอร์ก่อน (ยังไม่ตัดสต็อก — ตัดตอน mark paid)
     var ins = await c.from('orders').insert({ order_no: o.no, customer: o.cust, address: o.addr, items: o.items, subtotal: o.sub, discount: o.d, shipping: o.ship, total: o.total, discount_code: o.code, payment_method: o.pay, status: o.status, tracking: o.track, note: o.note, stock_deducted: 0, log: o.log, user_id: (SB_USER && SB_USER.id) || null, customer_email: em.toLowerCase() });
     if (ins.error) { delete ORDS[o.no]; T(t('สั่งไม่สำเร็จ: ', 'Order failed: ') + ins.error.message); done(); return; }
-    var dd = await c.rpc('deduct_for_order', { p_no: o.no });
-    if (dd.error) {
-      // ระบบตัดสต็อกล้มเหลว (เช่น ยังไม่รัน migration) — เก็บออเดอร์ไว้ให้ staff จัดการ ไม่ล้างตะกร้า
-      T(t('ระบบตัดสต็อกล้มเหลว ออเดอร์ถูกบันทึกแล้ว ร้านจะติดต่อกลับ (', 'Stock system error — order saved, shop will contact you (') + String((dd.error && dd.error.message) || dd.error).slice(0, 80) + ')');
-      done(); location.hash = '#/done/' + o.no; return;
-    }
-    if (!dd.data || !dd.data.ok) {
-      var hv = (dd.data && dd.data.have) != null ? dd.data.have : 0;
-      o.status = 'cancelled'; o.log.push({ t: new Date().toISOString(), s: 'Auto-cancelled: insufficient stock' });
-      try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
-      await loadSupabase();
-      T(t('ของไม่พอ (เหลือ ', 'Insufficient (only ') + hv + t(' ชิ้น) ออเดอร์ถูกยกเลิก ปรับตะกร้าใหม่', ' left) — order cancelled'));
-      done(); location.hash = '#/cart'; go(); return;
-    }
-    o.stockDone = 1;
-    try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
-    await loadSupabase(); // ดึงสต็อกใหม่จาก server
   } else {
-    // local mode: ตัดในเครื่องทันที
-    o.items.forEach(function (l) {
-      var p = gp(l.id); if (!p) return;
-      if (hasVS(p)) { var k = vsKey(l.c, l.s); p.vstock[k] = Math.max(0, (parseInt(p.vstock[k], 10) || 0) - l.qty); vsSync(p); }
-      else if (hasCS(p)) { p.cstock[l.c] = Math.max(0, (parseInt(p.cstock[l.c], 10) || 0) - l.qty); p.stock = cstockSum(p.cstock); }
-      else p.stock = Math.max(0, p.stock - l.qty);
-    });
-    o.stockDone = 1;
+    // local mode: ยังไม่ตัดตอนสั่ง รอ mark paid เหมือนกัน
     try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
     saveLocal();
   }
@@ -836,11 +812,18 @@ async function ost(no, v) {
   o.status = v; o.log.push({ t: new Date().toISOString(), s: 'Status → ' + v + ' by ' + myRole() });
   var c = sb(), resync = false;
   if (v == 'paid' && !o.stockDone) {
-    // ออเดอร์เก่า (สั่งก่อนระบบตัดทันที) ตัดตอนนี้ครั้งเดียว
+    // ตัดสต็อกตอนชำระเงินแล้ว (atomic ผูกออเดอร์ กันตัดซ้ำ)
     if (c) {
       var dd = await c.rpc('deduct_for_order', { p_no: no });
-      if (dd.error || !dd.data || !dd.data.ok) T(t('ตัดสต็อกไม่สำเร็จ ของอาจไม่พอ', 'Deduct failed — possibly insufficient'));
-      else { o.stockDone = 1; resync = true; }
+      if (dd.error || !dd.data || !dd.data.ok) {
+        var hv = (dd.data && dd.data.have) != null ? dd.data.have : null;
+        T(t('ตัดสต็อกไม่สำเร็จ', 'Deduct failed') + (hv != null ? ' (' + t('เหลือ ', 'left ') + hv + ')' : '') + t(' — ของอาจไม่พอ สถานะไม่เปลี่ยน', ' — possibly insufficient, status unchanged'));
+        o.status = prev; o.log.push({ t: new Date().toISOString(), s: 'Paid reverted: deduct failed' });
+        try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
+        await dbUpdateOrder(no, { status: prev, tracking: o.track, note: o.note, log: o.log, stock_deducted: 0 });
+        go(); return;
+      }
+      o.stockDone = 1; resync = true;
     } else {
       o.items.forEach(function (l) {
         var p = gp(l.id); if (!p) return;
