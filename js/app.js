@@ -321,7 +321,7 @@ function prod(id) {
   SEL.c = SEL.c && p.colors.indexOf(SEL.c) > -1 ? SEL.c : p.colors[0]; SEL.s = SEL.s && p.sizes.indexOf(SEL.s) > -1 ? SEL.s : p.sizes[0]; var a = av(p);
   var csN = hasVS(p) || hasCS(p) ? vstockOf(p, SEL.c, SEL.s) : p.stock;
   if (Q > Math.max(1, csN)) Q = Math.max(1, csN);
-  var csMsg = (hasVS(p) || hasCS(p)) ? '<div class="sm" style="margin-top:6px">' + t('ชุดนี้เหลือ ', 'This variant: ') + csN + t(' ชิ้น · ทั้งหมด ', ' pcs · total ') + p.stock + t(' ชิ้น', ' pcs') + '</div>' : '';
+  var csMsg = '<div class="sm" id="pd-left" style="margin-top:6px">' + ((hasVS(p) || hasCS(p)) ? t('ชุดนี้เหลือ ', 'This variant: ') + csN + t(' ชิ้น · ทั้งหมด ', ' pcs · total ') + p.stock + t(' ชิ้น', ' pcs') : t('คงเหลือ ', 'Remaining ') + p.stock + t(' ชิ้น', ' pcs')) + '</div>';
   function dt(t, x, d) { return '<details><summary>' + t + '</summary><p>' + esc(x || d || 'Details will be added soon.') + '</p></details>'; }
   return '<p class="sm" style="margin-bottom:20px"><a href="#/shop">Collection</a> / ' + esc(p.cat) + '</p><div class="pp">' + gal(p) +
     '<div class="pi"><span class="sm">' + esc(p.coll) + '</span><div class="row"><h1 style="flex:1">' + esc(p.name) + '</h1>' + wishBtn(p.id) + '</div><div class="price">' + thb(p.price) + (p.compare > p.price ? '<s>' + thb(p.compare) + '</s>' : '') + '</div><p style="color:#b9b8ae">' + esc(p.desc) + '</p>' +
