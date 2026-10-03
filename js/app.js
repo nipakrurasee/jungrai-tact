@@ -603,7 +603,12 @@ async function arch(i) { if (!isStaff()) { T('ต้อง login เป็น st
 async function del(i) { if (!isOwner()) { T('ลบสินค้าได้เฉพาะ owner'); return; } if (!confirm(t('ลบ "', 'Delete "') + P[i].name + '"?')) return;   var id = P[i].id; P.splice(i, 1); delete IM[id]; delete CIM[id]; saveLocal(); await dbDeleteProduct(id); go(); }
 
 /* ---------- images (Storage-first) ---------- */
-function sync() { document.querySelectorAll('#fm [data-k]').forEach(function (e) { var k = e.dataset.k; if (k == 'colors' || k == 'sizes') return; E[k] = k == 'featured' ? (e.value == '1' ? 1 : 0) : e.value; }); }
+function sync() {
+  var f = document.getElementById('fm'); if (!f || !E) return;
+  f.querySelectorAll('[data-k]').forEach(function (e) { var k = e.dataset.k; if (k == 'colors' || k == 'sizes') return; E[k] = k == 'featured' ? (e.value == '1' ? 1 : 0) : e.value; });
+  var vsInputs = f.querySelectorAll('[data-vs]');
+  if (vsInputs.length) { var vsm = {}; vsInputs.forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) vsm[e.getAttribute('data-vs')] = v; }); E.vstock = vsm; }
+}
 function colorSuggest() {
   var seen = {}, out = [];
   (P || []).forEach(function (p) { (p.colors || []).forEach(function (c) { if (!seen[c]) { seen[c] = 1; out.push(c); } }); });
@@ -1156,11 +1161,7 @@ async function stockRefresh(manual, h) {
 /* จำดราฟที่กรอกค้างไว้ก่อนสลับหน้า (ไม่กดเซฟก็ไม่หาย) */
 function preserveDrafts() {
   try {
-    if (document.getElementById('fm')) {
-      sync();
-      var vsm = {}; document.querySelectorAll('#fm [data-vs]').forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) vsm[e.getAttribute('data-vs')] = v; });
-      if (E) { E.vstock = vsm; }
-    }
+    if (document.getElementById('fm')) sync();
     var co = {};
     ['em', 'nm', 'ph', 'ad', 'sd', 'ds', 'pv', 'zp'].forEach(function (id) { var el = document.getElementById(id); if (el) co[id] = el.value; });
     if (co.em != null || co.nm != null) {
