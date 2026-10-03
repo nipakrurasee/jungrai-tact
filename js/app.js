@@ -436,7 +436,34 @@ async function place() {
   var r = calc(), now = new Date().toISOString();
   var o = { no: 'JT-' + Date.now().toString(36).toUpperCase(), at: now, cust: { email: em, name: g('nm'), phone: ph }, addr: { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp }, items: items, sub: r.sub, d: r.d, ship: r.ship, total: r.total, code: DC, pay: document.querySelector('input[name=pay]:checked').value, status: 'new', track: '', note: '', stockDone: 0, log: [{ t: now, s: 'Order placed' }] };
   ORDS[o.no] = o; try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
-  dbSaveOrder(o);
+  var c = sb();
+  if (c) {
+    // 1. บันทึกออเดอร์ 2. ตัดสต็อกทันทีแบบ atomic (ของไม่พอ = ออเดอร์ถูก cancel อัตโนมัติ)
+    var ins = await c.from('orders').insert({ order_no: o.no, customer: o.cust, address: o.addr, items: o.items, subtotal: o.sub, discount: o.d, shipping: o.ship, total: o.total, discount_code: o.code, payment_method: o.pay, status: o.status, tracking: o.track, note: o.note, stock_deducted: 0, log: o.log, user_id: (SB_USER && SB_USER.id) || null, customer_email: em.toLowerCase() });
+    if (ins.error) { delete ORDS[o.no]; T(t('สั่งไม่สำเร็จ: ', 'Order failed: ') + ins.error.message); return; }
+    var dd = await c.rpc('deduct_for_order', { p_no: o.no });
+    if (dd.error || !dd.data || !dd.data.ok) {
+      o.status = 'cancelled'; o.log.push({ t: new Date().toISOString(), s: 'Auto-cancelled: insufficient stock' });
+      try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
+      await loadSupabase();
+      T(t('ของไม่พอแล้ว ออเดอร์ถูกยกเลิก ปรับตะกร้าใหม่', 'Insufficient stock — order cancelled'));
+      location.hash = '#/cart'; go(); return;
+    }
+    o.stockDone = 1;
+    try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
+    await loadSupabase(); // ดึงสต็อกใหม่จาก server
+  } else {
+    // local mode: ตัดในเครื่องทันที
+    o.items.forEach(function (l) {
+      var p = gp(l.id); if (!p) return;
+      if (hasVS(p)) { var k = vsKey(l.c, l.s); p.vstock[k] = Math.max(0, (parseInt(p.vstock[k], 10) || 0) - l.qty); vsSync(p); }
+      else if (hasCS(p)) { p.cstock[l.c] = Math.max(0, (parseInt(p.cstock[l.c], 10) || 0) - l.qty); p.stock = cstockSum(p.cstock); }
+      else p.stock = Math.max(0, p.stock - l.qty);
+    });
+    o.stockDone = 1;
+    try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
+    saveLocal();
+  }
   // จำที่อยู่เข้าบัญชี (ครั้งแรกสั่งแล้วครั้งต่อไปดึงมาเอง)
   if (SB_USER && sb()) {
     try { await sb().from('profiles').update({ full_name: g('nm'), phone: ph, address: { line: g('ad'), sub: g('sd'), dist: g('ds'), prov: g('pv'), zip: zp } }).eq('id', SB_USER.id); } catch (e) {}
@@ -716,18 +743,44 @@ function adminOrd() {
 }
 async function ost(no, v) {
   if (!isStaff()) { T('ต้อง login เป็น staff'); return; }
-  var o = ORDS[no]; o.status = v; o.log.push({ t: new Date().toISOString(), s: 'Status → ' + v + ' by ' + myRole() });
+  var o = ORDS[no], prev = o.status;
+  var wasOut = (prev === 'cancelled' || prev === 'refunded');
+  o.status = v; o.log.push({ t: new Date().toISOString(), s: 'Status → ' + v + ' by ' + myRole() });
+  var c = sb(), resync = false;
   if (v == 'paid' && !o.stockDone) {
-    o.items.forEach(function (l) {
-      var p = gp(l.id); if (!p) return;
-      if (hasVS(p)) { var k = vsKey(l.c, l.s); p.vstock[k] = Math.max(0, (parseInt(p.vstock[k], 10) || 0) - l.qty); vsSync(p); }
-      else if (hasCS(p)) { p.cstock[l.c] = Math.max(0, (parseInt(p.cstock[l.c], 10) || 0) - l.qty); p.stock = cstockSum(p.cstock); }
-      else p.stock = Math.max(0, p.stock - l.qty);
-    });
-    o.stockDone = 1; P.forEach(function (p) { dbUpsertProduct(p); }); saveLocal();
+    // ออเดอร์เก่า (สั่งก่อนระบบตัดทันที) ตัดตอนนี้ครั้งเดียว
+    if (c) {
+      var dd = await c.rpc('deduct_for_order', { p_no: no });
+      if (dd.error || !dd.data || !dd.data.ok) T(t('ตัดสต็อกไม่สำเร็จ ของอาจไม่พอ', 'Deduct failed — possibly insufficient'));
+      else { o.stockDone = 1; resync = true; }
+    } else {
+      o.items.forEach(function (l) {
+        var p = gp(l.id); if (!p) return;
+        if (hasVS(p)) { var k = vsKey(l.c, l.s); p.vstock[k] = Math.max(0, (parseInt(p.vstock[k], 10) || 0) - l.qty); vsSync(p); }
+        else if (hasCS(p)) { p.cstock[l.c] = Math.max(0, (parseInt(p.cstock[l.c], 10) || 0) - l.qty); p.stock = cstockSum(p.cstock); }
+        else p.stock = Math.max(0, p.stock - l.qty);
+      });
+      o.stockDone = 1; saveLocal();
+    }
+  }
+  if ((v == 'cancelled' || v == 'refunded') && o.stockDone && !wasOut) {
+    // ยกเลิก = คืนสต็อก
+    if (c) {
+      var rs = await c.rpc('restore_for_order', { p_no: no });
+      if (!rs.error && rs.data && rs.data.ok) { o.stockDone = 0; resync = true; }
+    } else {
+      o.items.forEach(function (l) {
+        var p = gp(l.id); if (!p) return;
+        if (hasVS(p)) { var k2 = vsKey(l.c, l.s); p.vstock[k2] = (parseInt(p.vstock[k2], 10) || 0) + l.qty; vsSync(p); }
+        else if (hasCS(p)) { p.cstock[l.c] = (parseInt(p.cstock[l.c], 10) || 0) + l.qty; p.stock = cstockSum(p.cstock); }
+        else p.stock = p.stock + l.qty;
+      });
+      o.stockDone = 0; saveLocal();
+    }
   }
   try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {}
   await dbUpdateOrder(no, { status: v, tracking: o.track, note: o.note, log: o.log, stock_deducted: o.stockDone ? 1 : 0 });
+  if (resync) await loadSupabase();
   go();
 }
 async function oset(no, k, v) { if (!isStaff()) { T('ต้อง login เป็น staff'); return; } ORDS[no][k] = v; try { localStorage.setItem('jg_orders', JSON.stringify(ORDS)); } catch (e) {} var patch = {}; patch[k == 'track' ? 'tracking' : k] = v; await dbUpdateOrder(no, patch); T(t('บันทึกแล้ว', 'Saved')); }
