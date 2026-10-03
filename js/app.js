@@ -566,7 +566,7 @@ function form() {
     sec('4', t('รายละเอียด', 'Details')) +
     fld('desc', t('คำโปรยสั้น', 'Short description'), 'ta', 'w4') + fld('spec', t('สเปก', 'Specifications'), 'ta', 'w2') + fld('material', t('วัสดุ', 'Material'), 'ta', 'w2') + fld('dims', t('ขนาด', 'Dimensions'), 'ta', 'w2') + fld('notes', t('โน้ตภาคสนาม', 'Field notes'), 'ta', 'w2') +
     sec('5', t('รูปภาพ (สูงสุด 4)', 'Images (max 4)')) + imgui() +
-    '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">' + t('บันทึกสินค้า', 'Save product') + '</button><button class="btn" onclick="E=null;go()">' + t('ยกเลิก', 'Cancel') + '</button></div></div>';
+    '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">' + t('บันทึกสินค้า', 'Save product') + '</button><button class="btn" onclick="cancelEdit()">' + t('ยกเลิก', 'Cancel') + '</button></div></div>';
 }
 function edit(i) { E = i < 0 ? mk('new-' + Date.now().toString(36), '', 'Apparel', 'Core', 0, 0, 0, 0, ['Black'], ['One size'], 0, '') : JSON.parse(JSON.stringify(P[i])); E._i = i; E._id = i < 0 ? E.id : P[i].id; EI = (IM[E.id] || []).map(function (u) { return { u: u, c: '' }; }); Object.keys(CIM[E.id] || {}).forEach(function (col) { (CIM[E.id][col] || []).forEach(function (u) { EI.push({ u: u, c: col }); }); }); if (i < 0) { E.status = 'draft'; E.sku = ''; } go(); var f = $('#fm'); f && f.scrollIntoView({ behavior: 'smooth' }); }
 async function commit() {
@@ -607,7 +607,7 @@ async function commit() {
   CIM[o.id] = {}; EI.filter(function (e) { return e.c; }).forEach(function (e) { (CIM[o.id][e.c] = CIM[o.id][e.c] || []).push(e.u); });
   if (!Object.keys(CIM[o.id]).length) delete CIM[o.id];
   saveLocal(); await dbUpsertProduct(o);
-  E = null; T(t('บันทึกแล้ว', 'Saved')); go();
+  E = null; EI = []; clearDraft(); T(t('บันทึกแล้ว', 'Saved')); go();
 }
 async function arch(i) { if (!isStaff()) { T('ต้อง login เป็น staff'); return; } P[i].status = P[i].status == 'archived' ? 'draft' : 'archived'; saveLocal(); await dbUpsertProduct(P[i]); go(); }
 async function del(i) { if (!isOwner()) { T('ลบสินค้าได้เฉพาะ owner'); return; } if (!confirm(t('ลบ "', 'Delete "') + P[i].name + '"?')) return;   var id = P[i].id; P.splice(i, 1); delete IM[id]; delete CIM[id]; saveLocal(); await dbDeleteProduct(id); go(); }
@@ -618,7 +618,17 @@ function sync() {
   f.querySelectorAll('[data-k]').forEach(function (e) { var k = e.dataset.k; if (k == 'colors' || k == 'sizes') return; E[k] = k == 'featured' ? (e.value == '1' ? 1 : 0) : e.value; });
   var vsInputs = f.querySelectorAll('[data-vs]');
   if (vsInputs.length) { var vsm = {}; vsInputs.forEach(function (e) { var v = parseInt(e.value, 10); if (!isNaN(v) && v >= 0) vsm[e.getAttribute('data-vs')] = v; }); E.vstock = vsm; }
+  try { sessionStorage.setItem('jg_draft', JSON.stringify({ E: E, EI: EI })); } catch (e) {}
 }
+function clearDraft() { try { sessionStorage.removeItem('jg_draft'); } catch (e) {} }
+function loadDraft() {
+  try {
+    var d = JSON.parse(sessionStorage.getItem('jg_draft') || 'null');
+    if (d && d.E && (d.E._id || d.E._i != null)) { E = d.E; EI = d.EI || []; return true; }
+  } catch (e) {}
+  return false;
+}
+function cancelEdit() { E = null; EI = []; clearDraft(); go(); }
 function colorSuggest() {
   var seen = {}, out = [];
   (P || []).forEach(function (p) { (p.colors || []).forEach(function (c) { if (!seen[c]) { seen[c] = 1; out.push(c); } }); });
@@ -1172,6 +1182,10 @@ async function stockRefresh(manual, h) {
 function preserveDrafts() {
   try {
     if (document.getElementById('fm')) sync();
+    try {
+      if (HS) sessionStorage.setItem('jg_draft_home', JSON.stringify(HS));
+      if (PGS) sessionStorage.setItem('jg_draft_page', JSON.stringify(PGS));
+    } catch (e) {}
     var co = {};
     ['em', 'nm', 'ph', 'ad', 'sd', 'ds', 'pv', 'zp'].forEach(function (id) { var el = document.getElementById(id); if (el) co[id] = el.value; });
     if (co.em != null || co.nm != null) {
@@ -1185,7 +1199,13 @@ function checkoutStash() { try { return JSON.parse(sessionStorage.getItem('jg_ch
 window.addEventListener('hashchange', function () { preserveDrafts(); Q = 1; SEL = {}; hc(); go(); scrollTo(0, 0); });
 
 /* ---------- boot ---------- */
-loadLocal(); handleAuthRedirect(); hc(); go();
+loadLocal(); handleAuthRedirect(); hc();
+if (!E && loadDraft()) { /* มีดราฟค้าง: เปิดฟอร์มต่อ */ }
+try {
+  if (!HS) HS = JSON.parse(sessionStorage.getItem('jg_draft_home') || 'null');
+  if (!PGS) PGS = JSON.parse(sessionStorage.getItem('jg_draft_page') || 'null');
+} catch (e) {}
+go();
 (async function () {
   var ok = await loadSupabase();
   if (isStaff()) await sbLoadProfilesSilent();
