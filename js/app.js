@@ -541,12 +541,24 @@ function admin() {
 }
 function form() {
   var ro = myRole() === 'shop_admin' ? '<div class="note w4">Shop admin: แก้ได้เฉพาะ Stock / Low threshold / Status — ช่องอื่นจะถูกคงค่าเดิมตอนบันทึก</div>' : '';
-  return '<div class="fm" id="fm">' + ro + fld('name', 'Name', '', 'w2') + fld('sku', 'SKU') + fld('barcode', 'Barcode') +
-    '<label>Category<select data-k="cat">' + CAT.map(function (c) { return '<option' + (E.cat == c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label>' + fld('coll', 'Collection') +
-    '<label>Status<select data-k="status">' + ['active', 'draft', 'archived'].map(function (c) { return '<option' + (E.status == c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label>' +
-    '<label>Featured<select data-k="featured"><option value="0">No</option><option value="1"' + (E.featured ? ' selected' : '') + '>Yes</option></select></label>' +
-    fld('price', 'Price (THB)', 'number') + fld('compare', 'Compare-at', 'number') + fld('cost', 'Cost', 'number') + fld('stock', 'Stock', 'number') + fld('low', 'Low threshold', 'number') +
-    fld('colors', 'Colors (comma)', '', 'w2') + fld('sizes', 'Sizes (comma)', '', 'w2') + fld('tags', 'Tags', '', 'w4') + csui() + vsui() + fld('desc', 'Short description', 'ta', 'w4') + fld('spec', 'Specifications', 'ta', 'w2') + fld('material', 'Material', 'ta', 'w2') + fld('dims', 'Dimensions', 'ta', 'w2') + fld('notes', 'Field notes', 'ta', 'w2') + imgui() + '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">' + t('บันทึกสินค้า', 'Save product') + '</button><button class="btn" onclick="E=null;go()">' + t('ยกเลิก', 'Cancel') + '</button></div></div>';
+  var sec = function (n, t) { return '<h3 class="w4" style="font-size:24px;margin-top:8px"><span class="bd">' + n + '</span> ' + t + '</h3>'; };
+  return '<div class="fm" id="fm">' + ro +
+    sec('1', t('ข้อมูลหลัก', 'Basic info')) +
+    fld('name', t('ชื่อสินค้า *', 'Product name *'), '', 'w2') + fld('sku', 'SKU') + fld('barcode', 'Barcode') +
+    '<label>' + t('หมวด', 'Category') + '<select data-k="cat">' + CAT.map(function (c) { return '<option' + (E.cat == c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label>' + fld('coll', t('คอลเลกชัน', 'Collection')) +
+    '<label>' + t('สถานะขาย', 'Status') + '<select data-k="status">' + [['active', t('ขาย', 'Active')], ['draft', t('ฉบับร่าง', 'Draft')], ['archived', t('เก็บ', 'Archived')]].map(function (c) { return '<option value="' + c[0] + '"' + (E.status == c[0] ? ' selected' : '') + '>' + c[1] + '</option>'; }).join('') + '</select></label>' +
+    '<label>' + t('แนะนำหน้าแรก', 'Featured') + '<select data-k="featured"><option value="0">' + t('ไม่', 'No') + '</option><option value="1"' + (E.featured ? ' selected' : '') + '>' + t('ใช่', 'Yes') + '</option></select></label>' +
+    sec('2', t('ราคา', 'Pricing')) +
+    fld('price', t('ราคาขาย (฿) *', 'Price (THB) *'), 'number') + fld('compare', t('ราคาขีดฆ่า', 'Compare-at'), 'number') + fld('cost', t('ต้นทุน', 'Cost'), 'number') + '<div class="w4 sm" style="align-self:end">' + t('กำไร/ชิ้น = ราคาขาย − ต้นทุน', 'Margin = price − cost') + '</div>' +
+    sec('3', t('ตัวเลือก + สต็อก', 'Options + stock')) +
+    '<label class="w2">' + t('สี (คั่นจุลภาค)', 'Colors (comma)') + '<input data-k="colors" list="cl-suggest" value="' + esc(Array.isArray(E.colors) ? E.colors.join(', ') : E.colors) + '"></label><datalist id="cl-suggest"><option value="Black"><option value="Olive Drab"><option value="Sand"><option value="Concrete"><option value="RED"><option value="Green"><option value="Yellow"></datalist>' +
+    '<label class="w2">' + t('ไซส์ (คั่นจุลภาค)', 'Sizes (comma)') + '<input data-k="sizes" list="sz-suggest" value="' + esc(Array.isArray(E.sizes) ? E.sizes.join(', ') : E.sizes) + '"></label><datalist id="sz-suggest"><option value="One size"><option value="S"><option value="M"><option value="L"><option value="XL"></datalist>' +
+    fld('stock', t('สต็อกรวม', 'Total stock'), 'number') + fld('low', t('เตือนเมื่อเหลือ', 'Low threshold'), 'number') +
+    '<div class="w4 sm">' + t('ถ้ากรอกสต็อกแยกสี/ไซส์ด้านล่าง ยอดรวมจะคำนวณเอง', 'Fill per-color/size below and total is auto-calculated') + '</div>' + csui() + vsui() + fld('tags', 'Tags', '', 'w4') +
+    sec('4', t('รายละเอียด', 'Details')) +
+    fld('desc', t('คำโปรยสั้น', 'Short description'), 'ta', 'w4') + fld('spec', t('สเปก', 'Specifications'), 'ta', 'w2') + fld('material', t('วัสดุ', 'Material'), 'ta', 'w2') + fld('dims', t('ขนาด', 'Dimensions'), 'ta', 'w2') + fld('notes', t('โน้ตภาคสนาม', 'Field notes'), 'ta', 'w2') +
+    sec('5', t('รูปภาพ (สูงสุด 4)', 'Images (max 4)')) + imgui() +
+    '<div class="w4" style="display:flex;gap:10px"><button class="btn p" onclick="commit()">' + t('บันทึกสินค้า', 'Save product') + '</button><button class="btn" onclick="E=null;go()">' + t('ยกเลิก', 'Cancel') + '</button></div></div>';
 }
 function edit(i) { E = i < 0 ? mk('new-' + Date.now().toString(36), '', 'Apparel', 'Core', 0, 0, 0, 0, ['Black'], ['One size'], 0, '') : JSON.parse(JSON.stringify(P[i])); E._i = i; E._id = i < 0 ? E.id : P[i].id; EI = (IM[E.id] || []).map(function (u) { return { u: u, c: '' }; }); Object.keys(CIM[E.id] || {}).forEach(function (col) { (CIM[E.id][col] || []).forEach(function (u) { EI.push({ u: u, c: col }); }); }); if (i < 0) { E.status = 'draft'; E.sku = ''; } go(); var f = $('#fm'); f && f.scrollIntoView({ behavior: 'smooth' }); }
 async function commit() {
