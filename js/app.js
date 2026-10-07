@@ -186,10 +186,10 @@ function fixPG() {
   if (!PG.stories || !PG.stories.length) PG.stories = JSON.parse(JSON.stringify(DEFAULT_PAGE.stories));
   PG.stories.forEach(function (s) { if (s.img == null) s.img = ''; if (s.pids == null) s.pids = ''; if (s.l == null) s.l = '#/shop'; });
 }
-/* สตอรีผูกสินค้า + รูปคลัง: pids = "fs-01,gr-01" */
-function storyPids(s) { return String((s && s.pids) || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean); }
-function storyProds(s) { return storyPids(s).map(gp).filter(Boolean); }
-function storyHref(i, s) { return storyPids(s).length || simg(s.img) ? '#/story/' + i : safe(s.l); }
+/* สตอรีผูกสินค้า + รูปคลัง: pids = "fs-01,gr-01" — หน้า story โชว์เฉพาะตัวที่แท็กเท่านั้น */
+function storyPids(s) { var seen = {}; return String((s && s.pids) || '').split(',').map(function (x) { return String(x || '').trim(); }).filter(function (x) { return x && !seen[x] && (seen[x] = 1); }); }
+function storyProds(s) { return storyPids(s).map(gp).filter(function (p) { return p && p.status == 'active'; }); }
+function storyHref(i, s) { return '#/story/' + i; }
 /* รูปประจำสินค้า (ไฟล์ใน repo) สำหรับตัวที่ยังไม่มีรูปอัปโหลด */
 function imgFallback() {
   (P || []).forEach(function (p) {
@@ -506,8 +506,8 @@ function storyView(i) {
   var u = simg(s.img), ps = storyProds(s);
   var h = '<p class="sm" style="margin-bottom:20px"><a href="#/">Home</a> / ' + esc(s.k) + '</p>';
   h += '<div class="pn" style="aspect-ratio:16/7;overflow:hidden;position:relative">' + (u ? '<img src="' + u + '" alt="' + esc(s.t) + '" style="width:100%;height:100%;object-fit:cover">' : '') + '</div>';
-  h += '<div class="top" style="margin-top:16px"><div><span class="sm">' + esc(s.k) + '</span><h1>' + esc(s.t) + '</h1></div>' + (s.l && s.l !== '#/story/' + i ? '<a class="btn" href="' + esc(safe(s.l)) + '">' + t('ดูเพิ่มเติม', 'See more') + '</a>' : '') + '</div>';
-  if (!ps.length) return h + '<p class="sm">' + t('สตอรีนี้ยังไม่ผูกสินค้า — เลือกสินค้าที่ Sections ในหลังร้าน', 'No products linked yet — link products in Sections.') + ' <a href="#/shop" style="text-decoration:underline">' + t('ดูสินค้าทั้งหมด', 'Browse all') + '</a></p>';
+  h += '<div class="top" style="margin-top:16px"><div><span class="sm">' + esc(s.k) + '</span><h1>' + esc(s.t) + '</h1></div></div>';
+  if (!ps.length) return h + '<p class="sm">' + t('สตอรีนี้ยังไม่แท็กสินค้า', 'No tagged items in this story yet.') + '</p>';
   h += '<div class="top"><h2>' + t('ไอเทมในลุคนี้', 'Shop this story') + '</h2><span class="sm">' + ps.length + ' ' + t('ชิ้น', 'items') + '</span></div><div class="gr">';
   h += ps.map(function (p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p.id) + '" class="pn">' + pic(p, 0) + '</a><div class="in"><h3>' + esc(p.name) + '</h3><div class="row"><span>' + thb(p.price) + '</span><span class="av ' + a[0] + '"><b></b>' + a[1] + '</span></div><div class="row">' + wishBtn(p.id) + (p.stock > 0 ? '<button class="btn s" onclick="qadd(\'' + esc(p.id) + '\')">' + t('หยิบใส่ตะกร้า', 'Quick add') + '</button>' : '') + '</div></div></div>'; }).join('');
   return h + '</div>';
