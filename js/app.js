@@ -21,7 +21,7 @@ var DEFAULT_PAGE = {
   show: { cats: 1, brand: 1, featured: 1, stories: 1, drop: 0, news: 1 },
   cats: [{ t: 'Apparel', l: '#/shop?cat=Apparel' }, { t: 'Field Gear', l: '#/shop?cat=Field Gear' }, { t: 'Accessories', l: '#/shop?cat=Accessories' }, { t: 'Patches', l: '#/shop?cat=Patches' }],
   brand: { h: 'Built for the field.', p: 'JUNGRAI TACT — เสื้อผ้าและอุปกรณ์ภาคสนาม ทน พร้อมใช้จริง' },
-  stories: [{ k: 'Story 01', t: 'Night patrol', l: '#/shop' }, { k: 'Story 02', t: 'Urban carry', l: '#/shop' }, { k: 'Story 03', t: 'Jungle ready', l: '#/shop' }, { k: 'Story 04', t: 'Range day', l: '#/shop' }, { k: 'Story 05', t: 'Base camp', l: '#/shop' }],
+  stories: [{ k: 'Story 01', t: 'Night patrol', l: '#/shop', img: '', pids: '' }, { k: 'Story 02', t: 'Urban carry', l: '#/shop', img: '', pids: '' }, { k: 'Story 03', t: 'Jungle ready', l: '#/shop', img: '', pids: '' }, { k: 'Story 04', t: 'Range day', l: '#/shop', img: '', pids: '' }, { k: 'Story 05', t: 'Base camp', l: '#/shop', img: '', pids: '' }],
   drop: { on: 0, label: 'Limited', h: 'Drop 001', p: 'Coming soon', at: '', b: 'Notify me', l: '#/shop' },
   news: { h: 'Join the field list', p: 'ข่าวดรอปใหม่และส่วนลด' },
   codes: [{ c: 'FIELD10', t: 'pct', v: 10 }, { c: 'WELCOME100', t: 'fixed', v: 100 }, { c: 'FREESHIP', t: 'ship', v: 0 }],
@@ -182,7 +182,14 @@ function loadLocal() {
 function fixPG() {
   if (!PG.codes) PG.codes = [{ c: 'FIELD10', t: 'pct', v: 10 }, { c: 'WELCOME100', t: 'fixed', v: 100 }, { c: 'FREESHIP', t: 'ship', v: 0 }];
   if (!PG.ship) PG.ship = { rate: 60, free: 2000 };
+  // stories: เติม img (รูปปกจากคลัง) + pids (สินค้าที่ผูก "id,id") ให้ของเก่าที่ยังไม่มี
+  if (!PG.stories || !PG.stories.length) PG.stories = JSON.parse(JSON.stringify(DEFAULT_PAGE.stories));
+  PG.stories.forEach(function (s) { if (s.img == null) s.img = ''; if (s.pids == null) s.pids = ''; if (s.l == null) s.l = '#/shop'; });
 }
+/* สตอรีผูกสินค้า + รูปคลัง: pids = "fs-01,gr-01" */
+function storyPids(s) { return String((s && s.pids) || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean); }
+function storyProds(s) { return storyPids(s).map(gp).filter(Boolean); }
+function storyHref(i, s) { return storyPids(s).length || simg(s.img) ? '#/story/' + i : safe(s.l); }
 /* รูปประจำสินค้า (ไฟล์ใน repo) สำหรับตัวที่ยังไม่มีรูปอัปโหลด */
 function imgFallback() {
   (P || []).forEach(function (p) {
@@ -487,10 +494,23 @@ function homeView() {
   if (sh.brand) h += '<section class="sec st"><div class="w"><h2>' + esc(PG.brand.h) + '</h2><p>' + esc(PG.brand.p) + '</p></div></section>';
   var fp = list().filter(function (p) { return p.featured; })[0];
   if (sh.featured && fp) { var a = av(fp); h += '<div class="fp"><div class="pn">' + pic(fp, 0) + '</div><div class="in2"><span class="sm">' + esc(fp.coll) + '</span><h2>' + esc(fp.name) + '</h2><div class="price" style="font:700 32px var(--hd)">' + thb(fp.price) + '</div><p style="color:#b9b8ae;max-width:46ch">' + esc(fp.desc) + '</p><div class="av ' + a[0] + '"><b></b>' + a[1] + '</div><div><a class="btn p" href="#/p/' + esc(fp.id) + '">' + t('ดูสินค้า', 'View product') + '</a></div></div></div>'; }
-  if (sh.stories) h += '<section class="sec"><div class="w"><div class="top"><h2 style="font-size:clamp(40px,6vw,88px)">' + t('เรื่องจากภาคสนาม', 'Field stories') + '</h2></div><div class="sg">' + PG.stories.map(function (c, i) { return '<a class="sc pn" href="' + esc(safe(c.l)) + '" style="background:linear-gradient(180deg,' + SC[i % 5] + ',#0e0e0b)"><span class="sm">' + esc(c.k) + '</span><h3>' + esc(c.t) + '</h3></a>'; }).join('') + '</div></div></section>';
+  if (sh.stories) h += '<section class="sec"><div class="w"><div class="top"><h2 style="font-size:clamp(40px,6vw,88px)">' + t('เรื่องจากภาคสนาม', 'Field stories') + '</h2></div><div class="sg">' + PG.stories.map(function (c, i) { var u = simg(c.img); var n = storyPids(c).length; return '<a class="sc pn" href="' + esc(storyHref(i, c)) + '"' + (u ? ' style="background-image:url(\'' + u + '\');background-size:cover;background-position:center"' : ' style="background:linear-gradient(180deg,' + SC[i % 5] + ',#0e0e0b)"') + '><span class="sm">' + esc(c.k) + (n ? ' · ' + n + ' ' + t('ชิ้น', 'items') : '') + '</span><h3>' + esc(c.t) + '</h3></a>'; }).join('') + '</div></div></section>';
   var d = PG.drop; if (sh.drop && d.on) h += '<div class="drop"><div class="w"><div><span class="sm">' + esc(d.label) + '</span><h2>' + esc(d.h) + '</h2></div><div><div class="cdn"><div><b id="dd">00</b><span class="sm">' + t('วัน', 'Days') + '</span></div><div><b id="dh">00</b><span class="sm">' + t('ชม.', 'Hours') + '</span></div><div><b id="dm">00</b><span class="sm">' + t('นาที', 'Min') + '</span></div><div><b id="ds">00</b><span class="sm">' + t('วิ', 'Sec') + '</span></div></div><p style="margin-bottom:20px">' + esc(d.p) + '</p>' + (d.b ? '<a class="btn" href="' + esc(safe(d.l)) + '">' + esc(d.b) + '</a>' : '') + '</div></div></div>';
   if (sh.news) h += '<section class="sec nl"><div class="w"><h2 style="font-size:clamp(40px,7vw,100px)">' + esc(PG.news.h) + '</h2>' + (PG.news.p ? '<p style="color:#b9b8ae;margin-top:12px">' + esc(PG.news.p) + '</p>' : '') + '<form onsubmit="nsub(event)"><input type="email" required placeholder="email@example.com"><button type="submit">' + t('สมัคร', 'Subscribe') + '</button></form></div></section>';
   return h;
+}
+/* ---------- story detail: รูปปกจากคลัง + สินค้าที่ผูก ---------- */
+function storyView(i) {
+  var s = (PG.stories || [])[+i];
+  if (!s) return '<p>' + t('ไม่พบสตอรี', 'Story not found.') + ' <a href="#/" style="text-decoration:underline">' + t('กลับหน้าแรก', 'Back home') + '</a></p>';
+  var u = simg(s.img), ps = storyProds(s);
+  var h = '<p class="sm" style="margin-bottom:20px"><a href="#/">Home</a> / ' + esc(s.k) + '</p>';
+  h += '<div class="pn" style="aspect-ratio:16/7;overflow:hidden;position:relative">' + (u ? '<img src="' + u + '" alt="' + esc(s.t) + '" style="width:100%;height:100%;object-fit:cover">' : '') + '</div>';
+  h += '<div class="top" style="margin-top:16px"><div><span class="sm">' + esc(s.k) + '</span><h1>' + esc(s.t) + '</h1></div>' + (s.l && s.l !== '#/story/' + i ? '<a class="btn" href="' + esc(safe(s.l)) + '">' + t('ดูเพิ่มเติม', 'See more') + '</a>' : '') + '</div>';
+  if (!ps.length) return h + '<p class="sm">' + t('สตอรีนี้ยังไม่ผูกสินค้า — เลือกสินค้าที่ Sections ในหลังร้าน', 'No products linked yet — link products in Sections.') + ' <a href="#/shop" style="text-decoration:underline">' + t('ดูสินค้าทั้งหมด', 'Browse all') + '</a></p>';
+  h += '<div class="top"><h2>' + t('ไอเทมในลุคนี้', 'Shop this story') + '</h2><span class="sm">' + ps.length + ' ' + t('ชิ้น', 'items') + '</span></div><div class="gr">';
+  h += ps.map(function (p) { var a = av(p); return '<div class="cd"><a href="#/p/' + esc(p.id) + '" class="pn">' + pic(p, 0) + '</a><div class="in"><h3>' + esc(p.name) + '</h3><div class="row"><span>' + thb(p.price) + '</span><span class="av ' + a[0] + '"><b></b>' + a[1] + '</span></div><div class="row">' + wishBtn(p.id) + (p.stock > 0 ? '<button class="btn s" onclick="qadd(\'' + esc(p.id) + '\')">' + t('หยิบใส่ตะกร้า', 'Quick add') + '</button>' : '') + '</div></div></div>'; }).join('');
+  return h + '</div>';
 }
 function hshow(i, m) { var l = document.querySelectorAll('.sl'), d = document.querySelectorAll('.hd button'); if (!l.length) return; HK = i % l.length; l.forEach(function (e, j) { e.classList.toggle('on', j == HK); }); d.forEach(function (e, j) { e.classList.toggle('on', j == HK); }); if (m) heroInit(1); }
 function heroInit(k) { clearInterval(HT); if (!k) HK = 0; if (H.slides.length < 2) return; HT = setInterval(function () { hshow(HK + 1); }, Math.max(3, H.secs || 7) * 1000); }
@@ -735,6 +755,15 @@ function closeMediaPicker() { mediaCb = null; var ov = document.getElementById('
 function pickMedia(i) { var m = MD[i]; if (m && mediaCb) { var cb = mediaCb; closeMediaPicker(); cb(m.url); } }
 function pickProductImg() { sync(); if (EI.length >= 4) { T(t('ได้สูงสุด 4 รูป', 'Max 4 images')); return; } openMediaPicker(function (url) { EI.push({u:url,c:''}); redraw(); }); }
 function pickSlideImg(i) { openMediaPicker(function (url) { HS.slides[i].img = url; redraw(); }); }
+function pickStoryImg(i) { if (!PGS) PGS = JSON.parse(JSON.stringify(PG)); openMediaPicker(function (url) { pset('stories.' + i + '.img', url); redraw(); }); }
+function clearStoryImg(i) { pset('stories.' + i + '.img', ''); redraw(); }
+function storyTogglePid(i, id, on) {
+  var cur = storyPids(pget(PGS, 'stories.' + i));
+  if (on && cur.indexOf(id) < 0) cur.push(id);
+  if (!on) cur = cur.filter(function (x) { return x !== id; });
+  pset('stories.' + i + '.pids', cur.join(','));
+  redraw();
+}
 function pickLogoImg() { openMediaPicker(function (url) { HS.logoUrl = url; redraw(); }); }
 function pickWmImg() { openMediaPicker(function (url) { HS.wmUrl = url; redraw(); }); }
 
@@ -787,11 +816,21 @@ function pck(p, l, c) { return '<label class="' + (c || '') + '" style="flex-dir
 function psel(p, l, o, c) { var v = pget(PGS, p); return '<label class="' + (c || '') + '">' + l + '<select onchange="pset(\'' + p + '\',this.value)">' + o.map(function (a) { return '<option value="' + a[0] + '"' + (v == a[0] ? ' selected' : '') + '>' + a[1] + '</option>'; }).join('') + '</select></label>'; }
 function adminSec() {
   if (!PGS) PGS = JSON.parse(JSON.stringify(PG));
+  if (!PGS.stories || !PGS.stories.length) PGS.stories = JSON.parse(JSON.stringify(DEFAULT_PAGE.stories));
+  PGS.stories.forEach(function (s) { if (s.img == null) s.img = ''; if (s.pids == null) s.pids = ''; if (s.l == null) s.l = '#/shop'; });
   var h3 = function (t) { return '<h3 class="w4" style="font-size:28px">' + t + '</h3>'; }, x = '';
   x += '<div class="fm">' + h3(t('เปิด/ปิดส่วน', 'Show/hide')) + [['cats', t('คอลเลกชัน', 'Collection')], ['brand', t('แบรนด์', 'Brand')], ['featured', t('แนะนำ', 'Featured')], ['stories', t('สตอรี', 'Stories')], ['drop', 'Drop'], ['news', t('ข่าวสาร', 'Newsletter')]].map(function (a) { return pck('show.' + a[0], a[1]); }).join('') + '</div>';
   x += '<div class="fm">' + h3(t('การ์ดคอลเลกชัน', 'Collection cards')) + [0, 1, 2, 3].map(function (i) { return pin('cats.' + i + '.t', t('การ์ด ', 'Card ') + (i + 1), '', 'w2') + pin('cats.' + i + '.l', t('ลิงก์', 'Link'), '', 'w2'); }).join('') + '</div>';
   x += '<div class="fm">' + h3(t('แบรนด์', 'Brand')) + pin('brand.h', t('หัวข้อ', 'Headline'), '', 'w4') + pin('brand.p', t('เนื้อความ', 'Paragraph'), 'ta', 'w4') + '</div>';
-  x += '<div class="fm">' + h3(t('สตอรี', 'Stories')) + [0, 1, 2, 3, 4].map(function (i) { return pin('stories.' + i + '.k', t('ป้าย', 'Label')) + pin('stories.' + i + '.t', t('หัวข้อ', 'Title'), '', 'w2') + pin('stories.' + i + '.l', t('ลิงก์', 'Link')); }).join('') + '</div>';
+  x += '<div class="fm">' + h3(t('สตอรี', 'Stories')) + '<p class="sm w4">' + t('รูปปกเลือกจากคลัง + ติ๊กสินค้าที่ผูก กดชื่อเพื่อดูหน้าสตอรี', 'Cover from library + tick linked products. Click title to preview.') + '</p>' + [0, 1, 2, 3, 4].map(function (i) {
+    var s = pget(PGS, 'stories.' + i) || {}, u = simg(s.img), sel = storyPids(s);
+    var boxes = P.map(function (p) { return '<label style="flex-direction:row;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px"><input type="checkbox"' + (sel.indexOf(p.id) > -1 ? ' checked' : '') + ' onchange="storyTogglePid(' + i + ',\'' + esc(p.id) + '\',this.checked)"> ' + esc(p.name) + '</label>'; }).join('');
+    return '<div class="w4" style="border:1px solid var(--ln);padding:12px;display:grid;gap:10px"><div class="row"><b><a href="#/story/' + i + '" target="_blank" style="text-decoration:underline">' + t('สตอรี ', 'Story ') + (i + 1) + '</a></b><span class="sm">' + sel.length + t(' สินค้าที่ผูก', ' linked') + '</span></div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' + pin('stories.' + i + '.k', t('ป้าย', 'Label')) + pin('stories.' + i + '.t', t('หัวข้อ', 'Title'), '', '') + '</div>'
+      + pin('stories.' + i + '.l', t('ลิงก์สำรอง (ถ้าไม่ผูกสินค้า)', 'Fallback link (when unlinked)'))
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' + (u ? '<img src="' + u + '" alt="" style="width:120px;height:68px;object-fit:cover;border:1px solid var(--ln)">' : '<span class="sm">' + t('ยังไม่มีรูปปก', 'No cover') + '</span>') + '<button class="btn s" onclick="pickStoryImg(' + i + ')">' + t('เลือกรูปจากคลัง', 'Pick from library') + '</button>' + (u ? '<button class="btn s d" onclick="clearStoryImg(' + i + ')">' + t('ลบรูป', 'Remove') + '</button>' : '') + '</div>'
+      + '<div><span class="sm">' + t('สินค้าที่ผูก', 'Linked products') + '</span><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;margin-top:6px">' + boxes + '</div></div></div>';
+  }).join('') + '</div>';
   x += '<div class="fm">' + h3('Drop') + pck('drop.on', t('โชว์ดรอป', 'Show drop'), 'w4') + pin('drop.label', t('ป้าย', 'Label'), '', 'w2') + pin('drop.h', t('หัวข้อ', 'Headline'), '', 'w2') + pin('drop.p', t('คำอธิบาย', 'Desc'), 'ta', 'w4') + pin('drop.at', t('วันวางขาย', 'Release'), 'datetime-local', 'w2') + pin('drop.b', t('ปุ่ม', 'Button')) + pin('drop.l', t('ลิงก์', 'Link')) + '</div>';
   x += '<div class="fm">' + h3(t('ข่าวสาร', 'Newsletter')) + pin('news.h', t('หัวข้อ', 'Headline'), '', 'w2') + pin('news.p', t('ข้อความ', 'Text'), '', 'w2') + '</div>';
   x += '<div class="fm">' + h3(t('โค้ดส่วนลด', 'Discount codes')) + [0, 1, 2].map(function (i) { return pin('codes.' + i + '.c', t('โค้ด', 'Code')) + psel('codes.' + i + '.t', t('ประเภท', 'Type'), [['pct', t('เปอร์เซ็นต์', 'Percent')], ['fixed', t('บาท', 'Fixed THB')], ['ship', t('ส่งฟรี', 'Free ship')]]) + pin('codes.' + i + '.v', t('มูลค่า', 'Value'), 'number') + '<span></span>'; }).join('') + '</div>';
@@ -1123,7 +1162,7 @@ function deny(page) { var needOwner = page === 'Owner only'; return jtShell(need
 /* ---------- router ---------- */
 function go() {
   clearInterval(HT); clearInterval(HT2); fixPG();
-  var h = location.hash || '#/', m = h.match(/^#\/p\/(.+)$/), m2 = h.match(/^#\/done\/(.+)$/), mEdit = null, a = $('#app'), isH = h == '#/' || h == '#';
+  var h = location.hash || '#/', m = h.match(/^#\/p\/(.+)$/), m2 = h.match(/^#\/done\/(.+)$/), mStory = h.match(/^#\/story\/(\d+)$/), mEdit = null, a = $('#app'), isH = h == '#/' || h == '#';
   document.querySelector('main').className = isH ? 'h' : '';
   var v;
   if (h === '#/account/orders') v = myOrdersView();
@@ -1151,6 +1190,7 @@ function go() {
   else if (h === '#/product') v = jtShell(t('สินค้า', 'Product'), '#/product', '<div class="jt-panel"><p>' + t('เลือกสินค้าจาก Shop', 'Pick a product from Shop') + '</p><a class="btn p" href="#/shop">' + t('ไปดูสินค้า', 'Go to Shop') + '</a></div>');
   else if (h === '#/order-complete' || m2) { var no = m2 ? decodeURIComponent(m2[1]) : null; v = no ? doneView(no) : jtShell('Order Complete', '#/order-complete', '<div class="jt-panel"><p>Done</p></div>'); }
   else if (m) v = prod(decodeURIComponent(m[1]));
+  else if (mStory) v = storyView(mStory[1]);
   else if (h.indexOf('#/cart') === 0) v = cartView();
   else if (h.indexOf('#/checkout') === 0) v = checkoutView();
   else if (h === '#/wishlist') v = wishView();
