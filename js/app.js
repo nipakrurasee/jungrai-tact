@@ -503,9 +503,8 @@ function homeView() {
 function storyView(i) {
   var s = (PG.stories || [])[+i];
   if (!s) return '<p>' + t('ไม่พบสตอรี', 'Story not found.') + ' <a href="#/" style="text-decoration:underline">' + t('กลับหน้าแรก', 'Back home') + '</a></p>';
-  var u = simg(s.img), ps = storyProds(s);
+  var ps = storyProds(s);
   var h = '<p class="sm" style="margin-bottom:20px"><a href="#/">Home</a> / ' + esc(s.k) + '</p>';
-  h += '<div class="pn" style="aspect-ratio:16/7;overflow:hidden;position:relative">' + (u ? '<img src="' + u + '" alt="' + esc(s.t) + '" style="width:100%;height:100%;object-fit:cover">' : '') + '</div>';
   h += '<div class="top" style="margin-top:16px"><div><span class="sm">' + esc(s.k) + '</span><h1>' + esc(s.t) + '</h1></div></div>';
   if (!ps.length) return h + '<p class="sm">' + t('สตอรีนี้ยังไม่แท็กสินค้า', 'No tagged items in this story yet.') + '</p>';
   h += '<div class="top"><h2>' + t('ไอเทมในลุคนี้', 'Shop this story') + '</h2><span class="sm">' + ps.length + ' ' + t('ชิ้น', 'items') + '</span></div><div class="gr">';
